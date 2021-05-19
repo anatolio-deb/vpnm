@@ -1,0 +1,4 @@
+.vscode
+*.lock
+*.toml
+__pycache__

@@ -14,4 +14,4 @@ An alternative [VPNManager](https://vpn-m.com/) client for Linux CLI.
 
 # Tests
 
-Tested manually on Ubuntu Linux 18.04 bionic.# vpnm
+Tested manually on Ubuntu Linux 18.04 bionic.
