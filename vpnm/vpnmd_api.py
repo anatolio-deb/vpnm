@@ -2,37 +2,73 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import re
 import subprocess
+from typing import Tuple
 
 import simple_term_menu
-import web_api
 from sockets_framework import Session as Client
-from web_api import AbstractPath
+from systemd_run_wrapper import Systemd
+
+from . import web_api
 
 
-def _get_original_gateway() -> str:
-    """Find the default route in a routing table with a minimal priority
-    excluding the one to tun2socks if it exists"""
-    proc = subprocess.run("ip route".split(), check=True, capture_output=True)
-    priorities = {}
-    for record in proc.stdout.decode().split("\n"):
-        if "default" in record and "10.0.0.1" not in record:
-            metric: str = ""
-            for param in record.split():
-                try:
-                    address = ipaddress.IPv4Address(param)
-                except ipaddress.AddressValueError:
-                    if metric:
-                        break
-                else:
-                    metric = record[record.find("metric") :].split()[-1]
-                    if metric.isnumeric():
-                        priorities[address.exploded] = int(metric)
-    return min(priorities)
+def _get_ifindex_and_ifaddr(ifindex: int, ifaddr: str) -> Tuple:
+    proc = subprocess.run(["ip", "a"], check=True, capture_output=True)
+
+    if ifaddr and ifindex:
+        if ifaddr in proc.stdout.decode() and f"tun{ifindex}" in proc.stdout.decode():
+            return (ifindex, ifaddr)
+
+    pattern = re.compile(r"tun\d*")
+    ifaces = pattern.findall(proc.stdout.decode())
+
+    if not ifaces:
+        ifindex = 0
+    else:
+        pattern = re.compile(r"\d*")
+        ifindex = max(list(map(int, pattern.findall("".join(ifaces))))) + 1
+
+    pattern = re.compile(r"\d*.\d*.\d*.\d*/\d*")
+    nets = pattern.findall(proc.stdout.decode())
+
+    reserved = [
+        "10.0.0.0/8",
+        "100.64.0.0/10",
+        "172.16.0.0/12",
+        "192.0.0.0/24",
+        "198.18.0.0/15",
+    ]
+
+    for network in reserved:
+        for subnet in ipaddress.IPv4Network(network).subnets():
+            if subnet.exploded not in nets:
+                ifaddr = f"{subnet[2].exploded}/24"
+    return (ifindex, ifaddr)
 
 
-class Session(AbstractPath):
-    file = AbstractPath.root / "session.json"
+def _get_default_gateway_with_metric(ifindex: str) -> Tuple:
+    proc = subprocess.run(["ip", "route"], check=True, capture_output=True)
+    pattern = re.compile(r"default")
+    defaults = [
+        record
+        for record in proc.stdout.decode().split("\n")
+        if f"tun{ifindex}" not in record and pattern.match(record)
+    ]
+    pattern = re.compile(r"metric \d*")
+    metrics = pattern.findall("".join(defaults))
+    metric = min(
+        [int(metric) for metric in "".join(metrics).split() if metric.isnumeric()]
+    )
+    gateways = [default for default in defaults if f"metric {metric}" in default]
+    pattern = re.compile(r"via \d*.\d*.\d*.\d*")
+    records = pattern.findall("".join(gateways))
+    addresses = [address for address in "".join(records).split() if address != "via"]
+    return (metric - 1, addresses[0])
+
+
+class Session(web_api.AbstractPath):
+    file = web_api.AbstractPath.root / "session.json"
     _data: dict = {}
 
     def __init__(self) -> None:
@@ -60,116 +96,59 @@ class Connection:
     nodes: list[web_api.Node] = []
     node: web_api.Node
     secret = web_api.Secret()
-    original_gateway = _get_original_gateway()
     remote = ("localhost", 4000)
-    route_priorities: list[int] = []
-    args = "systemd-run --user --no-block -p Restart=on-failure"
     session = Session()
-    ifname = "tun0"
-    ifaddr = "10.0.0.2"
-    tun2socks_addr = "10.0.0.1"
-
-    @staticmethod
-    def _stop(unit: str):
-        subprocess.run(
-            f"systemctl --user stop {unit}".split(),
-            check=True,
-            capture_output=False,
-        )
-
-    @staticmethod
-    def is_active(unit: str) -> bool:
-        proc = subprocess.run(
-            f"systemctl --user is-active {unit}".split(),
-            check=False,
-            capture_output=True,
-        )
-        if proc.stdout.decode().strip() == "active":
-            return True
-        return False
+    systemd = Systemd(user_mode=True)
 
     def stop(self):
-        for unit in (
-            self.session.data.get("badvpn-tun2socks", {}).get("unit"),
-            self.session.data.get("v2ray", {}).get("unit"),
-        ):
-            if unit and self.is_active(unit):
-                self._stop(unit)
+        unit = self.session.data.get("v2ray", {}).get("unit")
+
+        if unit and self.systemd.is_active(unit):
+            self.systemd.stop(unit)
 
         with Client(self.remote) as client:
-            client.commit("delete_tuntap")
-
-            node_address = self.session.data.get("v2ray", {}).get("address")
-
-            if node_address:
-                client.commit("delete_node_route", node_address, self.original_gateway)
+            client.commit("tun2socks_stop")
+            client.commit("delete_node_route")
 
     def start(self):
+        response = web_api.get_nodes(self.secret.data)
+
+        for data in response.json().get("data").get("node"):
+            node = web_api.Node.get_node(data)
+            if node.config:
+                self.nodes.append(node)
+        terminal_menu = simple_term_menu.TerminalMenu(
+            [node.name for node in self.nodes]
+        )
+        menu_entry_index = terminal_menu.show()
+        node = self.nodes[menu_entry_index]
+
+        node.set_address()
+
         with Client(self.remote) as client:
-            client.commit("add_tuntap")
-            client.commit("add_ifaddr")
-
-            response = web_api.get_nodes(self.secret.data)
-
-            for data in response.json().get("data").get("node"):
-                node = web_api.Node.get_node(data)
-                if node.config:
-                    self.nodes.append(node)
-            terminal_menu = simple_term_menu.TerminalMenu(
-                [node.name for node in self.nodes]
+            ifindex, ifaddr = client.commit("get_ifindex_and_ifaddr")
+            ifindex, ifaddr = _get_ifindex_and_ifaddr(ifindex, ifaddr)
+            metric, default_gateway_address = _get_default_gateway_with_metric(ifindex)
+            client.commit(
+                "add_node_route", node.address, default_gateway_address, metric - 1
             )
-            menu_entry_index = terminal_menu.show()
-            node = self.nodes[menu_entry_index]
-
-            node.set_address()
-
-            with open("/tmp/config.json", "w") as file:
-                json.dump(node.config, file)
-
-            with open("/tmp/config.json", "r") as file:
-                config = json.load(file)
-
+            client.commit(
+                "tun2socks_start", ifindex=ifindex, ifaddr=ifaddr, metric=metric
+            )
             unit = self.session.data.get("v2ray", {}).get("unit")
 
-            if unit and self.is_active(unit) and config != node.config:
-                self._stop(unit)
-
-            if not unit or not self.is_active(unit):
-                proc = subprocess.run(
-                    f"{self.args} v2ray -config /tmp/config.json".split(),
-                    check=True,
-                    capture_output=True,
-                )
-
-                self.session.data = {
-                    "v2ray": {
-                        "unit": proc.stderr.decode().split(":")[1].strip(),
-                        "address": node.address,
-                    }
-                }
-
-            unit = self.session.data.get("badvpn-tun2socks", {}).get("unit")
-
-            if not unit or not self.is_active(unit):
-                proc = subprocess.run(
-                    f"{self.args} \
-                    badvpn-tun2socks \
-                    --tundev {self.ifname} \
-                    --netif-ipaddr {self.tun2socks_addr} \
-                    --netif-netmask 255.255.255.0 \
-                    --socks-server-addr 127.0.0.1:1080".split(),
-                    check=True,
-                    capture_output=True,
-                )
-
-                self.session.data = {
-                    "badvpn-tun2socks": {
-                        "unit": proc.stderr.decode().split(":")[1].strip()
-                    }
-                }
-
-            client.commit("set_if_up")
-            client.commit("add_node_route", node.address, self.original_gateway)
-            client.commit("add_default_route")
+            try:
+                with open("/tmp/config.json", "r") as file:
+                    if json.load(file) != node.config:
+                        if unit and self.systemd.is_active(unit):
+                            self.systemd.stop(unit)
+                        raise FileNotFoundError
+            except FileNotFoundError:
+                with open("/tmp/config.json", "w") as file:
+                    json.dump(node.config, file)
+            finally:
+                if not unit or not self.systemd.is_active(unit):
+                    unit = self.systemd.run(["v2ray", "-config", "/tmp/config.json"])
+                    self.session.data = {"v2ray": unit}
 
             self.node = node
