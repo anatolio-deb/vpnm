@@ -8,7 +8,7 @@ from vpnm.utils import check_ip
 @click.group()
 def cli():
     """VPN Manager - secure internet access"""
-
+    pass
 
 @cli.command(help="Login into VPN Manager account.")
 @click.option(
