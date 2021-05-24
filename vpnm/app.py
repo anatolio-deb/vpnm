@@ -10,15 +10,15 @@ def cli():
     """VPN Manager - secure internet access"""
     pass
 
-@cli.command(help="Login into VPN Manager account.")
+@cli.command(help="Login into VPN Manager account")
 @click.option(
-    "--email", prompt=web_api.get_prompt_desicion(), help="Registered email address."
+    "--email", prompt=web_api.get_prompt_desicion(), help="Registered email address"
 )
 @click.option(
     "--password",
     prompt=web_api.get_prompt_desicion(),
     hide_input=True,
-    help="Password provided at registration.",
+    help="Password provided at registration",
 )
 def login(email: str, password: str):
     if web_api.get_prompt_desicion():
@@ -36,7 +36,7 @@ def login(email: str, password: str):
         click.secho("Logged in", fg="green")
 
 
-@cli.command(help="Connect to the desired location.")
+@cli.command(help="Connect to the desired location")
 def connect():
     """Sends an IPC request to the VPNM daemon service"""
     if not web_api.get_prompt_desicion():
@@ -83,7 +83,7 @@ def connect():
         click.secho("Check it with 'vpnm login'", fg="bright_black")
 
 
-@cli.command(help="Disconnect from the VPN service.")
+@cli.command(help="Disconnect from the VPN service")
 def disconnect():
     connection = vpnmd_api.Connection()
 
@@ -96,7 +96,7 @@ def disconnect():
         click.secho("Disconnected", fg="red")
 
 
-@cli.command(help="Logout from your VPN Manager account.")
+@cli.command(help="Logout from your VPN Manager account")
 def logout():
     """Remove the web_api.PathService.secret"""
     if not web_api.get_prompt_desicion():
