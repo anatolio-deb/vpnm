@@ -3,3 +3,6 @@
 *.toml
 __pycache__
 .mypy_cache
+dist
+build
+*.psec
