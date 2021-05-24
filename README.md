@@ -6,9 +6,9 @@ An alternative [VPN Manager](https://vpn-m.com/) client for Linux CLI.
 
 - [badvpn-tun2socks](https://github.com/xjasonlyu/tun2socks)
 - [cloudflared](https://github.com/cloudflare/cloudflared)
+- systemd
 - [vpnmd](https://github.com/anatolio-deb/vpnmd)
 - [v2ray](http://v2ray.com)
-- systemd
 
 ## To-do
 
