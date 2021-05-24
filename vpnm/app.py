@@ -1,8 +1,8 @@
 import click
 import requests
-import vpnmd_api
-import web_api
-from utils import check_ip
+
+from vpnm import vpnmd_api, web_api
+from vpnm.utils import check_ip
 
 
 @click.group()

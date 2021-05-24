@@ -8,7 +8,8 @@ from __future__ import annotations
 import socket
 
 import requests
-from utils import AbstractPath
+
+from vpnm.utils import AbstractPath
 
 APIS = ("https://ssle.ru/api/", "https://ddnn.ru/api/", "https://vm-vpnm.appspot.com/")
 

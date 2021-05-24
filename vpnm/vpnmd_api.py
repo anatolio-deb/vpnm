@@ -7,9 +7,10 @@ import subprocess
 from typing import Tuple
 
 import simple_term_menu
-import web_api
 from sockets_framework import Session as Client
-from utils import Systemd
+
+from vpnm import web_api
+from vpnm.utils import Systemd
 
 
 def _get_ifindex_and_ifaddr(ifindex: int, ifaddr: str) -> Tuple:
