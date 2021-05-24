@@ -96,7 +96,7 @@ def disconnect():
         click.secho("Disconnected", fg="red")
 
 
-@cli.command(help="Logout from you VPN Manager account.")
+@cli.command(help="Logout from your VPN Manager account.")
 def logout():
     """Remove the web_api.PathService.secret"""
     if not web_api.get_prompt_desicion():
