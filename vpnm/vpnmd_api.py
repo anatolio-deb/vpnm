@@ -9,7 +9,7 @@ from typing import Tuple
 import simple_term_menu
 import web_api
 from sockets_framework import Session as Client
-from systemd_run_wrapper import Systemd
+from utils import Systemd
 
 
 def _get_ifindex_and_ifaddr(ifindex: int, ifaddr: str) -> Tuple:

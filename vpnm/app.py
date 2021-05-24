@@ -2,11 +2,12 @@ import click
 import requests
 import vpnmd_api
 import web_api
+from utils import check_ip
 
 
 @click.group()
 def cli():
-    pass
+    """VPN Manager - secure internet access"""
 
 
 @cli.command(help="Login into VPN Manager account.")
@@ -64,7 +65,7 @@ def connect():
                     )
                 click.secho(exception, fg="red")
         else:
-            address = web_api.check_ip()
+            address = check_ip()
 
             if address != connection.node.address:
                 click.secho(

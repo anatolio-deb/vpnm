@@ -5,27 +5,12 @@ Raises:
 """
 from __future__ import annotations
 
-import pathlib
 import socket
-from abc import ABCMeta, abstractmethod
 
 import requests
+from utils import AbstractPath
 
 APIS = ("https://ssle.ru/api/", "https://ddnn.ru/api/", "https://vm-vpnm.appspot.com/")
-
-
-def check_ip() -> str:
-    """Requests the client's IP address from https://api.ipify.org via HTTP GET
-
-    Returns:
-        str: Client's IP address or 'unknown'
-    """
-    try:
-        response = requests.get("https://api.ipify.org/")
-    except requests.exceptions.RequestException:
-        return "unknown"
-    else:
-        return response.text
 
 
 def get_token(email: str, password: str) -> requests.Response:
@@ -63,33 +48,6 @@ def get_nodes(token: str) -> requests.Response:
         except requests.RequestException as ex:
             exception = ex
     raise exception
-
-
-class AbstractPath(metaclass=ABCMeta):
-    root = pathlib.Path().home() / ".config/vpnm/"
-    _data: dict = {}
-
-    @property
-    @abstractmethod
-    def file(self) -> pathlib.Path:
-        pass
-
-    def __init__(self) -> None:
-        if not self.root.exists():
-            self.root.mkdir()
-
-    @property
-    @abstractmethod
-    def data(self):
-        pass
-
-    @classmethod
-    def __subclasshook__(cls, C):
-        if cls is AbstractPath:
-            attrs = set(dir(C))
-            if set(cls.__abstractmethods__) <= attrs:
-                return True
-        return NotImplemented
 
 
 class Secret(AbstractPath):
