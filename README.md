@@ -8,6 +8,7 @@ An alternative [VPN Manager](https://vpn-m.com/) client for Linux CLI.
 - [cloudflared](https://github.com/cloudflare/cloudflared)
 - [vpnmd](https://github.com/anatolio-deb/vpnmd)
 - [v2ray](http://v2ray.com)
+- systemd
 
 ## To-do
 
