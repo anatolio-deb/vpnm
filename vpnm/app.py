@@ -1,10 +1,7 @@
-from threading import Thread
-
 import click
 import requests
 import vpnmd_api
 import web_api
-from utils import animate
 
 
 @click.group()
@@ -14,15 +11,13 @@ def cli():
 
 @cli.command(help="Login into VPN Manager account.")
 @click.option(
-    "--email",
-    prompt=web_api.get_prompt_desicion(),
-    help="Registered email address."
+    "--email", prompt=web_api.get_prompt_desicion(), help="Registered email address."
 )
 @click.option(
     "--password",
     prompt=web_api.get_prompt_desicion(),
     hide_input=True,
-    help="Password provided at registration."
+    help="Password provided at registration.",
 )
 def login(email: str, password: str):
     if web_api.get_prompt_desicion():
@@ -45,11 +40,9 @@ def connect():
     """Sends an IPC request to the VPNM daemon service"""
     if not web_api.get_prompt_desicion():
         connection = vpnmd_api.Connection()
-        thread = Thread(target=connection.start)
 
         try:
-            thread.start()
-            animate(thread)
+            connection.start()
         except (
             requests.exceptions.RequestException,
             ConnectionRefusedError,
@@ -59,18 +52,17 @@ def connect():
             if isinstance(exception, ConnectionRefusedError):
                 click.echo("Is vpnm daemon running?")
                 click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
+            elif isinstance(exception, requests.exceptions.RequestException):
+                click.secho("Can't connect to API", fg="red")
             else:
                 connection.stop()
-                if isinstance(exception, requests.exceptions.RequestException):
-                    click.secho("Can't connect to API", fg="red")
-                elif isinstance(exception, ValueError):
-                    click.echo(exception)
+
+                if isinstance(exception, ValueError):
                     click.secho(
                         "Consider changing your DNS or trying another node",
                         fg="bright_black",
                     )
-                elif isinstance(exception, RuntimeError):
-                    click.secho(exception, fg="red")
+                click.secho(exception, fg="red")
         else:
             address = web_api.check_ip()
 
@@ -93,10 +85,9 @@ def connect():
 @cli.command(help="Disconnect from the VPN service.")
 def disconnect():
     connection = vpnmd_api.Connection()
-    thread = Thread(target=connection.stop)
+
     try:
-        thread.start()
-        animate(thread)
+        connection.stop()
     except ConnectionRefusedError:
         click.echo("Is vpnm daemon running?")
         click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")

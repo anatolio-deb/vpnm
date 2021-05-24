@@ -7,10 +7,9 @@ import subprocess
 from typing import Tuple
 
 import simple_term_menu
+import web_api
 from sockets_framework import Session as Client
 from systemd_run_wrapper import Systemd
-
-from . import web_api
 
 
 def _get_ifindex_and_ifaddr(ifindex: int, ifaddr: str) -> Tuple:
@@ -99,16 +98,22 @@ class Connection:
     remote = ("localhost", 4000)
     session = Session()
     systemd = Systemd(user_mode=True)
+    dns_port = 1053
+    socsk_port = web_api.Node.socks_port
 
     def stop(self):
-        unit = self.session.data.get("v2ray", {}).get("unit")
-
-        if unit and self.systemd.is_active(unit):
-            self.systemd.stop(unit)
+        for unit in (
+            self.session.data.get("v2ray", ""),
+            self.session.data.get("tun2socks", ""),
+            self.session.data.get("cloudflared", ""),
+        ):
+            if self.systemd.is_active(unit):
+                self.systemd.stop(unit)
 
         with Client(self.remote) as client:
-            client.commit("tun2socks_stop")
+            client.commit("delete_iface")
             client.commit("delete_node_route")
+            client.commit("delete_dns_rule")
 
     def start(self):
         response = web_api.get_nodes(self.secret.data)
@@ -132,23 +137,57 @@ class Connection:
             client.commit(
                 "add_node_route", node.address, default_gateway_address, metric - 1
             )
-            client.commit(
-                "tun2socks_start", ifindex=ifindex, ifaddr=ifaddr, metric=metric
-            )
-            unit = self.session.data.get("v2ray", {}).get("unit")
+            client.commit("add_iface", ifindex, ifaddr)
+            unit = self.session.data.get("tun2socks", "")
+
+            if not self.systemd.is_active(unit):
+                unit = self.systemd.run(
+                    [
+                        "tun2socks-linux-amd64",
+                        "-device",
+                        f"tun://tun{ifindex}",
+                        "-proxy",
+                        f"socks5://127.0.0.1:{self.socsk_port}",
+                    ]
+                )
+                self.session.data = {"tun2socks": unit}
+
+            client.commit("set_iface_up")
+            client.commit("add_default_route", metric)
+
+            unit = self.session.data.get("v2ray", "")
 
             try:
                 with open("/tmp/config.json", "r") as file:
                     if json.load(file) != node.config:
-                        if unit and self.systemd.is_active(unit):
+                        if self.systemd.is_active(unit):
                             self.systemd.stop(unit)
                         raise FileNotFoundError
             except FileNotFoundError:
                 with open("/tmp/config.json", "w") as file:
                     json.dump(node.config, file)
             finally:
-                if not unit or not self.systemd.is_active(unit):
+                if not self.systemd.is_active(unit):
                     unit = self.systemd.run(["v2ray", "-config", "/tmp/config.json"])
                     self.session.data = {"v2ray": unit}
 
-            self.node = node
+            unit = self.session.data.get("cloudflared", "")
+
+            if not self.systemd.is_active(unit):
+                unit = self.systemd.run(
+                    ["cloudflared", "proxy-dns", "--port", str(self.dns_port)],
+                )
+                self.session.data = {"cloudflared": unit}
+
+            while True:
+                proc = subprocess.run(
+                    ["dig", "@127.0.0.1", "-p", str(self.dns_port), node.host],
+                    check=False,
+                    capture_output=True,
+                )
+                if node.address in proc.stdout.decode():
+                    break
+
+            client.commit("add_dns_rule", str(self.dns_port))
+
+        self.node = node

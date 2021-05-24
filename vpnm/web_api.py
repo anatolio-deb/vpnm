@@ -11,6 +11,8 @@ from abc import ABCMeta, abstractmethod
 
 import requests
 
+APIS = ("https://ssle.ru/api/", "https://ddnn.ru/api/", "https://vm-vpnm.appspot.com/")
+
 
 def check_ip() -> str:
     """Requests the client's IP address from https://api.ipify.org via HTTP GET
@@ -36,9 +38,14 @@ def get_token(email: str, password: str) -> requests.Response:
     Returns:
         requests.Response: A request containing a web token
     """
-    return requests.post(
-        "https://ssle.ru/api/token", data={"email": email, "passwd": password}
-    )
+    for api in APIS:
+        try:
+            return requests.post(
+                f"{api}/token", data={"email": email, "passwd": password}
+            )
+        except requests.RequestException as ex:
+            exception = ex
+    raise exception
 
 
 def get_nodes(token: str) -> requests.Response:
@@ -50,7 +57,12 @@ def get_nodes(token: str) -> requests.Response:
     Returns:
         requests.Response: A request containing v2ray client's configurations as json
     """
-    return requests.get("https://ssle.ru/api/node3?access_token={}".format(token))
+    for api in APIS:
+        try:
+            return requests.get(f"{api}/node3?access_token={token}")
+        except requests.RequestException as ex:
+            exception = ex
+    raise exception
 
 
 class AbstractPath(metaclass=ABCMeta):
@@ -112,6 +124,7 @@ class Node:
 
     config: str
     address: str
+    socks_port: int = 1080
 
     def __init__(
         self,
@@ -135,6 +148,7 @@ class Node:
         self.online = online
         self.traffic_rate = traffic_rate
         self._set_config()
+        self.host = self.server["host"]
 
     def set_address(self):
         self.address = socket.gethostbyname(self.server["host"])
@@ -228,7 +242,11 @@ class Node:
                     }
                 ],
                 "inbounds": [
-                    {"protocol": "socks", "listen": "127.0.0.1", "port": 1080}
+                    {
+                        "protocol": "socks",
+                        "listen": "127.0.0.1",
+                        "port": self.socks_port,
+                    }
                 ],
             }
 
