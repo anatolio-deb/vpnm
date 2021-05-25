@@ -5,65 +5,27 @@ Raises:
 """
 from __future__ import annotations
 
+import json
 import socket
 
 import requests
-
-from vpnm.utils import AbstractPath
-
-APIS = ("https://ssle.ru/api/", "https://ddnn.ru/api/", "https://vm-vpnm.appspot.com/")
-
-
-def get_token(email: str, password: str) -> requests.Response:
-    """Requests a token from https://ssle.ru/api/token via HTTP POST
-
-    Args:
-        email (str): The client's email address registered at https://vpnm.ru
-        password (str): The client's password
-
-    Returns:
-        requests.Response: A request containing a web token
-    """
-    for api in APIS:
-        try:
-            return requests.post(
-                f"{api}/token", data={"email": email, "passwd": password}
-            )
-        except requests.RequestException as ex:
-            exception = ex
-    raise exception
-
-
-def get_nodes(token: str) -> requests.Response:
-    """Requests v2ray client's configurations from https://ssle.ru/api/ via HTTP GET
-
-    Args:
-        token (str): utils.get_token
-
-    Returns:
-        requests.Response: A request containing v2ray client's configurations as json
-    """
-    for api in APIS:
-        try:
-            return requests.get(f"{api}/node3?access_token={token}")
-        except requests.RequestException as ex:
-            exception = ex
-    raise exception
+from utils import AbstractPath
 
 
 class Secret(AbstractPath):
-    file = AbstractPath.root / "secret"
+    file = AbstractPath.root / "secret.json"
 
     @property
     def data(self):
         if self.file.exists():
             with self.file.open("r") as file:
-                return file.read()
+                return json.load(file)
         return None
 
     @data.setter
-    def data(self, token: str):
-        self.file.write_text(token)
+    def data(self, data: str):
+        with self.file.open("w") as file:
+            json.dump(data, file)
 
 
 def get_prompt_desicion():
@@ -261,6 +223,88 @@ class Node:
             node["online"],
             node["traffic_rate"],
         )
+
+
+class Auth:
+    apis = (
+        "https://ssle.ru/api/",
+        "https://ddnn.ru/api/",
+        "https://vm-vpnm.appspot.com/",
+    )
+    secret = Secret()
+    nodes: list = []
+    account: dict = {}
+
+    def get_token(self, email: str, password: str):
+        """Requests a token from https://ssle.ru/api/token via HTTP POST
+
+        Args:
+            email (str): The client's email address registered at https://vpnm.ru
+            password (str): The client's password
+
+        Returns:
+            requests.Response: A request containing a web token
+        """
+        for api in self.apis:
+            try:
+                response = requests.post(
+                    f"{api}/token", data={"email": email, "passwd": password}
+                )
+            except requests.RequestException as ex:
+                exception = ex
+            else:
+                if response.json()["msg"] != "ok":
+                    raise ValueError(response.json().get("msg"))
+
+                self.secret.data = response.json().get("data")
+                break
+
+        if not self.secret.data:
+            raise exception
+
+    def get_nodes(self):
+        """Requests v2ray client's configurations from https://ssle.ru/api/ via HTTP GET
+
+        Args:
+            token (str): utils.get_token
+
+        Returns:
+            requests.Response: A request containing v2ray client's configurations
+            as json
+        """
+        token = self.secret.data.get("token")
+
+        for api in self.apis:
+            try:
+                response = requests.get(f"{api}/node3?access_token={token}")
+            except requests.RequestException as ex:
+                exception = ex
+            else:
+                for data in response.json().get("data").get("node"):
+                    node = Node.get_node(data)
+
+                    if node.config:
+                        self.nodes.append(node)
+                break
+
+        if not self.nodes:
+            raise exception
+
+    def get_account(self):
+        user_id = self.secret.data.get("user_id")
+        token = self.secret.data.get("token")
+
+        for api in self.apis:
+            try:
+                response = requests.get(f"{api}user4/{user_id}?access_token={token}")
+            except requests.exceptions.RequestException as ex:
+                exception = ex
+            else:
+                self.account = response.json().get("data")
+                break
+
+        if not self.account:
+            raise exception
 
 
 if __name__ == "__main__":

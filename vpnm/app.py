@@ -1,8 +1,11 @@
+import datetime
+import re
+
 import click
 import requests
-
-from vpnm import vpnmd_api, web_api
-from vpnm.utils import check_ip
+import vpnmd_api
+import web_api
+from utils import check_ip
 
 
 @click.group()
@@ -10,30 +13,97 @@ def cli():
     """VPN Manager - secure internet access"""
     pass
 
+
 @cli.command(help="Login into VPN Manager account")
 @click.option(
-    "--email", prompt=web_api.get_prompt_desicion(), help="Registered email address"
+    "--email",
+    prompt=web_api.get_prompt_desicion(),
+    help="Registered email address",
+    default="nikiforova693@gmail.com",
 )
 @click.option(
     "--password",
     prompt=web_api.get_prompt_desicion(),
     hide_input=True,
     help="Password provided at registration",
+    default="xaswug-syVryc-huvfy9",
 )
 def login(email: str, password: str):
     if web_api.get_prompt_desicion():
+        auth = web_api.Auth()
+
         try:
-            response = web_api.get_token(email, password)
+            auth.get_token(email, password)
         except requests.exceptions.RequestException:
             click.secho("Can't connect to API", fg="red")
-        else:
-            if response.json()["msg"] != "ok":
-                click.secho(response.json()["msg"], fg="yellow")
-            else:
-                secret = web_api.Secret()
-                secret.data = response.json()["data"]["token"]
+        except ValueError as ex:
+            click.secho(ex, fg="yellow")
+
     if not web_api.get_prompt_desicion():
         click.secho("Logged in", fg="green")
+
+
+@cli.command(help="Get the current connection status")
+def status():
+    connection = vpnmd_api.Connection()
+
+    try:
+        connection.status()
+
+        if connection.node:
+            connection.node.set_address()
+            address = check_ip()
+        else:
+            raise ValueError
+    except (requests.exceptions.RequestException, ValueError, OSError):
+        click.secho("Not connected", fg="red")
+    else:
+        if address != connection.node.address:
+            click.secho(
+                "Your IP address is {}, however, {} is "
+                "expected.".format(address, connection.node.address),
+                fg="green",
+            )
+        else:
+            click.secho(
+                "Your IP address is {}.".format(connection.node.address), fg="green"
+            )
+        click.secho("Connected to {}.".format(connection.node.name), fg="green")
+
+
+@cli.command(help="Get information on your account")
+def account():
+    if not web_api.get_prompt_desicion():
+        auth = web_api.Auth()
+
+        try:
+            auth.get_account()
+        except requests.RequestException:
+            click.secho("Can't connect to API", fg="red")
+        else:
+            online = auth.account.get("online")
+            limit = auth.account.get("limit")
+            level = auth.account.get("account_level")
+            balance = auth.account.get("balance")
+
+            if level == 4:
+                level = "VIP"
+            elif level == 3:
+                level = "Premium"
+            elif level == 2:
+                level = "Standart"
+
+            pattern = re.compile(r"[\d.]*\d+")
+            remaining = pattern.findall(auth.account.get("remaining_flow"))[0]
+            total = auth.account.get("total_flow")
+            expire_date = datetime.datetime.fromtimestamp(
+                auth.account.get("expire_date")
+            ).strftime("%Y-%m-%d, %H:%M:%S")
+
+            click.echo(f"Current balance: {balance}")
+            click.echo(f"Devices online: {online}/{limit}")
+            click.echo(f"Expire date: {expire_date}")
+            click.echo(f"Traffic left: {remaining}/{total}")
 
 
 @cli.command(help="Connect to the desired location")
@@ -48,12 +118,12 @@ def connect():
             requests.exceptions.RequestException,
             ConnectionRefusedError,
             ValueError,
-            RuntimeError,
+            OSError,
         ) as exception:
             if isinstance(exception, ConnectionRefusedError):
                 click.echo("Is vpnm daemon running?")
                 click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
-            elif isinstance(exception, requests.exceptions.RequestException):
+            elif isinstance(exception, (requests.exceptions.RequestException, OSError)):
                 click.secho("Can't connect to API", fg="red")
             else:
                 connection.stop()

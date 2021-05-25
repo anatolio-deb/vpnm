@@ -7,10 +7,9 @@ import subprocess
 from typing import Tuple
 
 import simple_term_menu
+import web_api
 from sockets_framework import Session as Client
-
-from vpnm import web_api
-from vpnm.utils import Systemd
+from utils import Systemd
 
 
 def _get_ifindex_and_ifaddr(ifindex: int, ifaddr: str) -> Tuple:
@@ -93,14 +92,27 @@ class Session(web_api.AbstractPath):
 
 
 class Connection:
-    nodes: list[web_api.Node] = []
-    node: web_api.Node
+    auth = web_api.Auth()
+    node: web_api.Node = None
     secret = web_api.Secret()
     remote = ("localhost", 4000)
     session = Session()
     systemd = Systemd(user_mode=True)
     dns_port = 1053
     socsk_port = web_api.Node.socks_port
+
+    def status(self):
+        unit = self.session.data.get("v2ray", "")
+
+        if unit and self.systemd.is_active(unit):
+            self.auth.get_nodes()
+
+            with open("/tmp/config.json") as file:
+                config = json.load(file)
+
+            for node in self.auth.nodes:
+                if node.config == config:
+                    self.node = node
 
     def stop(self):
         for unit in (
@@ -117,18 +129,12 @@ class Connection:
             client.commit("delete_dns_rule")
 
     def start(self):
-        response = web_api.get_nodes(self.secret.data)
-
-        for data in response.json().get("data").get("node"):
-            node = web_api.Node.get_node(data)
-            if node.config:
-                self.nodes.append(node)
+        self.auth.get_nodes()
         terminal_menu = simple_term_menu.TerminalMenu(
-            [node.name for node in self.nodes]
+            [node.name for node in self.auth.nodes]
         )
         menu_entry_index = terminal_menu.show()
-        node = self.nodes[menu_entry_index]
-
+        node = self.auth.nodes[menu_entry_index]
         node.set_address()
 
         with Client(self.remote) as client:
