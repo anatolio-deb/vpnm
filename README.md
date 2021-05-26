@@ -1,6 +1,6 @@
 # vpnm
 
-An alternative [VPN Manager](https://vpn-m.com/) client for Linux CLI.
+An alternative [VPN Manager](https://vpn-m.com/) CLI client for Linux.
 
 ## Dependencies
 
@@ -13,7 +13,6 @@ An alternative [VPN Manager](https://vpn-m.com/) client for Linux CLI.
 ## To-do
 
 - Automated testing
-- Connection status check
 
 # Tests
 
