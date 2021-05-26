@@ -5,6 +5,7 @@ import click
 import requests
 import vpnmd_api
 import web_api
+from requests.exceptions import RequestException
 from utils import check_ip
 
 
@@ -158,11 +159,15 @@ def disconnect():
     connection = vpnmd_api.Connection()
 
     try:
-        connection.stop()
-    except ConnectionRefusedError:
-        click.echo("Is vpnm daemon running?")
-        click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
-    else:
+        connection.status()
+
+        if connection.node:
+            connection.stop()
+    except (FileNotFoundError, RequestException, ConnectionRefusedError) as ex:
+        if isinstance(ex, ConnectionRefusedError):
+            click.echo("Is vpnm daemon running?")
+            click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
+    finally:
         click.secho("Disconnected", fg="red")
 
 
