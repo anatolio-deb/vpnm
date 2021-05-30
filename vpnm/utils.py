@@ -1,13 +1,11 @@
 """Run the systemd transient services"""
 import pathlib
-import subprocess
 from abc import ABCMeta, abstractmethod
-from typing import Iterable
 
 import requests
 
 
-def check_ip() -> str:
+def get_actual_address() -> str:
     """Requests the client's IP address from https://api.ipify.org via HTTP GET
 
     Returns:
@@ -46,79 +44,3 @@ class AbstractPath(metaclass=ABCMeta):
             if set(cls.__abstractmethods__) <= attrs:
                 return True
         return NotImplemented
-
-
-class Systemd:
-    """A wrapper around 'systemd-run' command.
-    Manages transient systemd services with a subprocess facilities.
-    """
-
-    def __init__(self, user_mode: bool = False) -> None:
-        if user_mode:
-            user_flag = "--user"
-        else:
-            user_flag = ""
-        self._cmd = [
-            "systemd-run",
-            f"{user_flag}",
-            "--no-block",
-            "-p",
-            "Restart=on-failure",
-        ]
-        self.user_mode = user_mode
-        self._user_flag = user_flag
-
-    def run(self, cmd: Iterable, env: dict = None) -> str:
-        """Run a transient systemd service
-
-        Args:
-            cmd (Iterable): The command to run inside a systemd unit
-            known as ExecStart
-            options (dict, optional): systemd service's envirnoment
-            variables. Defaults to {}.
-
-        Returns:
-            str: The name of created unit file
-        """
-        if env:
-            for key, value in env.items():
-                self._cmd.extend(["-p", f"{key}={value}"])
-
-        self._cmd.extend(cmd)
-
-        proc = subprocess.run(
-            self._cmd,
-            check=True,
-            capture_output=True,
-        )
-
-        self._cmd = [
-            "systemd-run",
-            f"{self._user_flag}",
-            "--no-block",
-            "-p",
-            "Restart=on-failure",
-        ]
-
-        return proc.stderr.decode().split(":")[1].strip()
-
-    def is_active(self, unit: str) -> bool:
-        try:
-            proc = subprocess.run(
-                ["systemctl", f"{self._user_flag}", "is-active", f"{unit}"],
-                check=True,
-                capture_output=True,
-            )
-        except subprocess.CalledProcessError:
-            return False
-        else:
-            if "active" in proc.stdout.decode():
-                return True
-        return False
-
-    def stop(self, unit: str) -> None:
-        subprocess.run(
-            ["systemctl", f"{self._user_flag}", "stop", f"{unit}"],
-            check=True,
-            capture_output=True,
-        )

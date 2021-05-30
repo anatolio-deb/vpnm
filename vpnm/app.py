@@ -1,12 +1,12 @@
 import datetime
 import re
+from subprocess import CalledProcessError
 
 import click
 import requests
 import vpnmd_api
 import web_api
-from requests.exceptions import RequestException
-from utils import check_ip
+from utils import get_actual_address
 
 
 @click.group()
@@ -20,21 +20,21 @@ def cli():
     "--email",
     prompt=web_api.get_prompt_desicion(),
     help="Registered email address",
-    default="nikiforova693@gmail.com",
+    # default="nikiforova693@gmail.com",
 )
 @click.option(
     "--password",
     prompt=web_api.get_prompt_desicion(),
     hide_input=True,
     help="Password provided at registration",
-    default="xaswug-syVryc-huvfy9",
+    # default="xaswug-syVryc-huvfy9",
 )
 def login(email: str, password: str):
     if web_api.get_prompt_desicion():
         auth = web_api.Auth()
 
         try:
-            auth.get_token(email, password)
+            auth.set_secret(email, password)
         except requests.exceptions.RequestException:
             click.secho("Can't connect to API", fg="red")
         except ValueError as ex:
@@ -48,28 +48,10 @@ def login(email: str, password: str):
 def status():
     connection = vpnmd_api.Connection()
 
-    try:
-        connection.status()
-
-        if connection.node:
-            connection.node.set_address()
-            address = check_ip()
-        else:
-            raise ValueError
-    except (requests.exceptions.RequestException, ValueError, OSError):
-        click.secho("Not connected", fg="red")
+    if connection.is_active():
+        click.secho(f"Connected to {connection.address}", fg="green")
     else:
-        if address != connection.node.address:
-            click.secho(
-                "Your IP address is {}, however, {} is "
-                "expected.".format(address, connection.node.address),
-                fg="green",
-            )
-        else:
-            click.secho(
-                "Your IP address is {}.".format(connection.node.address), fg="green"
-            )
-        click.secho("Connected to {}.".format(connection.node.name), fg="green")
+        click.secho("Not connected", fg="red")
 
 
 @cli.command(help="Get information on your account")
@@ -78,7 +60,7 @@ def account():
         auth = web_api.Auth()
 
         try:
-            auth.get_account()
+            auth.set_account()
         except requests.RequestException:
             click.secho("Can't connect to API", fg="red")
         else:
@@ -108,23 +90,43 @@ def account():
 
 
 @cli.command(help="Connect to the desired location")
-def connect():
+@click.option(
+    "--best",
+    "mode",
+    help="Connect to the best server according to the latency",
+    flag_value="-best",
+    default="",
+)
+@click.option(
+    "--random",
+    "mode",
+    help="Connect to the random server",
+    flag_value="-random",
+    default="",
+)
+@click.option("--ping", help="Wether to ping servers", is_flag=True, default=False)
+def connect(mode, ping):
     """Sends an IPC request to the VPNM daemon service"""
+
     if not web_api.get_prompt_desicion():
         connection = vpnmd_api.Connection()
 
         try:
-            connection.start()
+            connection.start(mode, ping)
         except (
             requests.exceptions.RequestException,
             ConnectionRefusedError,
             ValueError,
             OSError,
+            CalledProcessError,
         ) as exception:
             if isinstance(exception, ConnectionRefusedError):
                 click.echo("Is vpnm daemon running?")
                 click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
-            elif isinstance(exception, (requests.exceptions.RequestException, OSError)):
+            elif isinstance(
+                exception,
+                (requests.exceptions.RequestException, OSError, CalledProcessError),
+            ):
                 click.secho("Can't connect to API", fg="red")
             else:
                 connection.stop()
@@ -136,19 +138,15 @@ def connect():
                     )
                 click.secho(exception, fg="red")
         else:
-            address = check_ip()
+            address = get_actual_address()
 
-            if address != connection.node.address:
+            click.secho(f"Connected to {address}", fg="green")
+
+            if address != connection.address:
                 click.secho(
-                    "Your IP address is {}, however, {} is "
-                    "expected.".format(address, connection.node.address),
-                    fg="green",
+                    f"However, {connection.address} is expected",
+                    fg="bright_black",
                 )
-            else:
-                click.secho(
-                    "Your IP address is {}.".format(connection.node.address), fg="green"
-                )
-            click.secho("Connected to {}.".format(connection.node.name), fg="green")
     else:
         click.echo("Are you logged in?")
         click.secho("Check it with 'vpnm login'", fg="bright_black")
@@ -159,14 +157,11 @@ def disconnect():
     connection = vpnmd_api.Connection()
 
     try:
-        connection.status()
-
-        if connection.node:
+        if connection.is_active():
             connection.stop()
-    except (FileNotFoundError, RequestException, ConnectionRefusedError) as ex:
-        if isinstance(ex, ConnectionRefusedError):
-            click.echo("Is vpnm daemon running?")
-            click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
+    except ConnectionRefusedError:
+        click.echo("Is vpnm daemon running?")
+        click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
     finally:
         click.secho("Disconnected", fg="red")
 
