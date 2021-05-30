@@ -11,13 +11,19 @@ jobs:
     runs-on: "ubuntu-latest"
 
     steps:
-      - name: "Build"
+      - uses: actions/checkout@v2
+      - name: "SEt up python3.9"
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      - name: "Install dependencies"
         run: |
-          ls
           python3 -m pip install --upgrade pip
           pip install poetry
           poetry export -f requirements.txt --output requirements.txt
           pip install -r requirements.txt
+      - name: "Build"
+        run: |
           pip install pyinstaller
           pyinstaller -F -n vpnm --clean vpnm/app.py
       - uses: "marvinpinto/action-automatic-releases@latest"
