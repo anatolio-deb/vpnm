@@ -1,18 +1,18 @@
-name: "tagged-release"
+name: "pre-release"
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - "main"
 
 jobs:
   tagget-release:
-    name: "Tagged Release"
+    name: "Pre Release"
     runs-on: "ubuntu-latest"
 
     steps:
       - uses: actions/checkout@v2
-      - name: "SEt up python3.9"
+      - name: "Set up python3.9"
         uses: actions/setup-python@v2
         with:
           python-version: 3.9
@@ -29,6 +29,8 @@ jobs:
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          prerelease: false
+          automatic_release_tag: "latest"
+          prerelease: true
+          title: "Development build"
           files: |
             dist/vpnm
