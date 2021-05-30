@@ -14,12 +14,14 @@ jobs:
       - name: "Build"
         run: |
           python3 -m pip install --upgrade pip
-          python3 -m pip install -r ./requirements.txt
-          python3 -m pip install pyinstaller
+          pip install poetry
+          poetry export -f requirements.txt --output requirements.txt
+          pip install -r requirements.txt
+          pip install pyinstaller
           pyinstaller -F -n vpnm --clean vpnm/app.py
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN}}"
           prerelease: false
           files: |
-            ./dist/vpnm
+            dist/vpnm

@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "vpnm"
+version = "0.1.0"
+description = ""
+authors = ["Anatolio Nikiforidis <nikiforova693@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+click = "^8.0.0"
+requests = "^2.25.1"
+sockets-framework = "^0.2.7"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+black = "^21.5b1"
+isort = "^5.8.0"
+pylint = "^2.8.2"
+pyinstaller = "^4.3"
+mypy = "^0.812"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+
