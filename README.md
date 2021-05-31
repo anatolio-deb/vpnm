@@ -2,6 +2,14 @@
 
 An alternative [VPN Manager](https://vpn-m.com/) client for Linux CLI.
 
+# **Installation**
+
+**Caution**: only development version currently available.
+
+```
+curl -L -o /tmp/install.py https://raw.githubusercontent.com/anatolio-deb/vpnm/main/install.py && sudo python3 /tmp/install.py
+```
+
 ## Dependencies
 
 - [cloudflared](https://github.com/cloudflare/cloudflared) — to forward DoH queries through the TUN interface
