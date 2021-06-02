@@ -4,9 +4,10 @@ from subprocess import CalledProcessError
 
 import click
 import requests
-import vpnmd_api
-import web_api
-from utils import get_actual_address
+from requests.exceptions import HTTPError
+
+from . import vpnmd_api, web_api
+from .utils import get_actual_address
 
 
 @click.group()
@@ -48,10 +49,14 @@ def login(email: str, password: str):
 def status():
     connection = vpnmd_api.Connection()
 
-    if connection.is_active():
-        click.secho(f"Connected to {connection.address}", fg="green")
-    else:
-        click.secho("Not connected", fg="red")
+    try:
+        if connection.is_active():
+            click.secho(f"Connected to {connection.address}", fg="green")
+        else:
+            click.secho("Not connected", fg="red")
+    except ConnectionRefusedError:
+        click.echo("Is vpnm daemon running?")
+        click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
 
 
 @cli.command(help="Get information on your account")
@@ -87,6 +92,9 @@ def account():
             click.echo(f"Devices online: {online}/{limit}")
             click.echo(f"Expire date: {expire_date}")
             click.echo(f"Traffic left: {remaining}/{total}")
+    else:
+        click.echo("Are you logged in?")
+        click.secho("Check it with 'vpnm login'", fg="bright_black")
 
 
 @cli.command(help="Connect to the desired location")
@@ -113,30 +121,19 @@ def connect(mode, ping):
 
         try:
             connection.start(mode, ping)
-        except (
-            requests.exceptions.RequestException,
-            ConnectionRefusedError,
-            ValueError,
-            OSError,
-            CalledProcessError,
-        ) as exception:
-            if isinstance(exception, ConnectionRefusedError):
-                click.echo("Is vpnm daemon running?")
-                click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
-            elif isinstance(
-                exception,
-                (requests.exceptions.RequestException, OSError, CalledProcessError),
-            ):
-                click.secho("Can't connect to API", fg="red")
+        except ConnectionRefusedError:
+            click.echo("Is vpnm daemon running?")
+            click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
+        except (requests.exceptions.RequestException, CalledProcessError) as ex:
+            if isinstance(ex, HTTPError):
+                click.secho(ex, fg="yellow")
             else:
-                connection.stop()
-
-                if isinstance(exception, ValueError):
-                    click.secho(
-                        "Consider changing your DNS or trying another node",
-                        fg="bright_black",
-                    )
-                click.secho(exception, fg="red")
+                click.secho("Can't connect to API", fg="red")
+        except OSError:
+            click.secho(
+                "Consider changing your DNS or trying another node",
+                fg="yellow",
+            )
         else:
             address = get_actual_address()
 
@@ -162,14 +159,14 @@ def disconnect():
     except ConnectionRefusedError:
         click.echo("Is vpnm daemon running?")
         click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
-    finally:
+    else:
         click.secho("Disconnected", fg="red")
 
 
 @cli.command(help="Logout from your VPN Manager account")
 def logout():
     """Remove the web_api.PathService.secret"""
-    if not web_api.get_prompt_desicion():
+    if not web_api.get_prompt_desicion() and web_api.Secret.file.exists():
         web_api.Secret.file.unlink()
     click.secho("Logged out", fg="red")
 

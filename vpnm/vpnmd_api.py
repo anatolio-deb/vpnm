@@ -7,10 +7,10 @@ import socket
 import subprocess
 from typing import Tuple
 
-import systemd
-import web_api
 from sockets_framework import Session as Client
-from utils import get_actual_address
+
+from . import systemd, web_api
+from .utils import get_actual_address
 
 PRIVATE_NETWORKS = [
     "10.0.0.0/8",
@@ -103,18 +103,13 @@ class Connection:
     address: str = ""
 
     def is_active(self):
-        unit = self.session.data.get("v2ray", "")
+        with Client(self.remote) as client:
+            node_address = client.commit("get_node_address")
 
-        if systemd.is_active(unit):
-            with Client(self.remote) as client:
-                _ifindex, _ifaddr = client.commit("get_ifindex_and_ifaddr")
-                ifindex, ifaddr = _get_ifindex_and_ifaddr(_ifindex, _ifaddr)
-                node_address = client.commit("get_node_address")
+        self.address = get_actual_address()
 
-            self.address = get_actual_address()
-
-            if node_address == self.address or [ifindex, ifaddr] == [_ifindex, _ifaddr]:
-                return True
+        if node_address == self.address:
+            return True
         return False
 
     def stop(self):
@@ -133,7 +128,7 @@ class Connection:
 
     def start(self, mode: str = "", ping: bool = False):
         self.auth.set_account()
-        link = self.auth.account.get("v2ray") + "?mu=2"
+        link = self.auth.account["v2ray"] + "?mu=2"
         cmd = [
             "v2gen_amd64_linux",
             "-loglevel",
@@ -155,6 +150,7 @@ class Connection:
 
         with open(self._config, "r") as file:
             config = json.load(file)
+
         host = config["outbounds"][0]["settings"]["vnext"][0]["address"]
         address = socket.gethostbyname(host)
 

@@ -3,7 +3,8 @@ from __future__ import annotations
 import json
 
 import requests
-from utils import AbstractPath
+
+from .utils import AbstractPath
 
 
 class Secret(AbstractPath):
@@ -84,6 +85,6 @@ class Auth:
                     if response.json()["msg"] == "ok":
                         self.account = response.json().get("data")
                     elif api is self.apis[-1]:
-                        raise ValueError(response.json().get("msg"))
+                        raise requests.exceptions.HTTPError(response.json().get("msg"))
             else:
                 break

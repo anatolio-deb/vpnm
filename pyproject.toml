@@ -17,6 +17,7 @@ isort = "^5.8.0"
 pylint = "^2.8.2"
 pyinstaller = "^4.3"
 mypy = "^0.812"
+vpnmd = {git = "https://github.com/anatolio-deb/vpnmd.git", rev = "main"}
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
