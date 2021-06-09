@@ -1,4 +1,5 @@
 """Run the systemd transient services"""
+import os
 import pathlib
 from abc import ABCMeta, abstractmethod
 
@@ -23,14 +24,14 @@ class AbstractPath(metaclass=ABCMeta):
     root = pathlib.Path().home() / ".config/vpnm/"
     _data: dict = {}
 
-    @property
+    @staticmethod
     @abstractmethod
-    def file(self) -> pathlib.Path:
+    def get_file():
         pass
 
     def __init__(self) -> None:
         if not self.root.exists():
-            self.root.mkdir()
+            os.makedirs(self.root)
 
     @property
     @abstractmethod

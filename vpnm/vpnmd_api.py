@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import pathlib
 import re
 import socket
 import subprocess
@@ -57,27 +58,34 @@ def _get_default_gateway_with_metric(ifindex: str) -> Tuple:
     ]
     pattern = re.compile(r"metric \d*")
     metrics = pattern.findall("".join(defaults))
-    metric = min(
-        [int(metric) for metric in "".join(metrics).split() if metric.isnumeric()]
-    )
-    gateways = [default for default in defaults if f"metric {metric}" in default]
     pattern = re.compile(r"via \d*.\d*.\d*.\d*")
-    records = pattern.findall("".join(gateways))
+    if metrics:
+        metric = min(
+            [int(metric) for metric in "".join(metrics).split() if metric.isnumeric()]
+        )
+        gateways = [default for default in defaults if f"metric {metric}" in default]
+        records = pattern.findall("".join(gateways))
+    else:
+        metric = 3
+        records = pattern.findall("".join(defaults))
     addresses = [address for address in "".join(records).split() if address != "via"]
     return (metric - 1, addresses[0])
 
 
 class Session(web_api.AbstractPath):
-    file = web_api.AbstractPath.root / "session.json"
     _data: dict = {}
+
+    @staticmethod
+    def get_file() -> pathlib.Path:
+        return web_api.AbstractPath.root / "session.json"
 
     def __init__(self) -> None:
         super().__init__()
-        if self.file.exists():
+        if self.get_file().exists():
             self._load_session()
 
     def _load_session(self):
-        with self.file.open("r") as file:
+        with self.get_file().open("r") as file:
             self._data = json.load(file)
 
     @property
@@ -87,7 +95,7 @@ class Session(web_api.AbstractPath):
     @data.setter
     def data(self, new_data: dict):
         self.data.update(new_data)
-        with self.file.open("w") as file:
+        with self.get_file().open("w") as file:
             json.dump(self.data, file, indent=4, sort_keys=True)
         self._load_session()
 
@@ -99,7 +107,7 @@ class Connection:
     session = Session()
     dns_port = 1053
     socks_port = 1080
-    _config = "/tmp/config.json"
+    config = "/tmp/config.json"
     address: str = ""
 
     def is_active(self):
@@ -136,7 +144,7 @@ class Connection:
             "-u",
             link,
             "-o",
-            self._config,
+            self.config,
         ]
 
         if not ping and mode != "-best":
@@ -148,7 +156,7 @@ class Connection:
 
         subprocess.run(cmd, check=True)
 
-        with open(self._config, "r") as file:
+        with open(self.config, "r") as file:
             config = json.load(file)
 
         host = config["outbounds"][0]["settings"]["vnext"][0]["address"]
@@ -187,7 +195,7 @@ class Connection:
             unit = self.session.data.get("v2ray", "")
 
             if not systemd.is_active(unit):
-                unit = systemd.run(["v2ray", "-config", self._config])
+                unit = systemd.run(["v2ray", "-config", self.config])
                 self.session.data = {"v2ray": unit}
 
             unit = self.session.data.get("cloudflared", "")

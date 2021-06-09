@@ -8,18 +8,20 @@ from .utils import AbstractPath
 
 
 class Secret(AbstractPath):
-    file = AbstractPath.root / "secret.json"
+    @staticmethod
+    def get_file():
+        return AbstractPath.root / "secret.json"
 
     @property
     def data(self):
-        if self.file.exists():
-            with self.file.open("r") as file:
+        if self.get_file().exists():
+            with self.get_file().open("r") as file:
                 return json.load(file)
         return {}
 
     @data.setter
     def data(self, data: str):
-        with self.file.open("w") as file:
+        with self.get_file().open("w") as file:
             json.dump(data, file)
 
 
@@ -30,7 +32,7 @@ def get_prompt_desicion():
     Returns:
         bool: True if there's no secret file on the clients filesystem, else False
     """
-    if Secret.file.exists():
+    if Secret.get_file().exists():
         return False
     return True
 
@@ -40,6 +42,7 @@ class Auth:
         "https://ssle.ru/api/",
         "https://ddnn.ru/api/",
         "https://vm-vpnm.appspot.com/",
+        "https://ssle2.ru/api/",
     )
     _secret = Secret()
     secret: dict = _secret.data
@@ -56,10 +59,10 @@ class Auth:
                     if api is self.apis[-1]:
                         raise
                 else:
-                    if response.json()["msg"] == "ok":
+                    if response.json().get("msg") == "ok":
                         self.secret = response.json().get("data")
                     elif api is self.apis[-1]:
-                        raise ValueError(response.json().get("msg"))
+                        raise requests.exceptions.HTTPError(response.json().get("msg"))
 
             else:
                 break

@@ -36,10 +36,11 @@ def login(email: str, password: str):
 
         try:
             auth.set_secret(email, password)
-        except requests.exceptions.RequestException:
-            click.secho("Can't connect to API", fg="red")
-        except ValueError as ex:
-            click.secho(ex, fg="yellow")
+        except requests.exceptions.RequestException as ex:
+            if isinstance(ex, HTTPError):
+                click.secho(ex, fg="yellow")
+            else:
+                click.secho("Can't connect to API", fg="red")
 
     if not web_api.get_prompt_desicion():
         click.secho("Logged in", fg="green")
@@ -112,7 +113,12 @@ def account():
     flag_value="-random",
     default="",
 )
-@click.option("--ping", help="Wether to ping servers", is_flag=True, default=False)
+@click.option(
+    "--ping",
+    help="Wether to ping servers before trying to connect",
+    is_flag=True,
+    default=False,
+)
 def connect(mode, ping):
     """Sends an IPC request to the VPNM daemon service"""
 
@@ -166,8 +172,8 @@ def disconnect():
 @cli.command(help="Logout from your VPN Manager account")
 def logout():
     """Remove the web_api.PathService.secret"""
-    if not web_api.get_prompt_desicion() and web_api.Secret.file.exists():
-        web_api.Secret.file.unlink()
+    if not web_api.get_prompt_desicion() and web_api.Secret.get_file().exists():
+        web_api.Secret.get_file().unlink()
     click.secho("Logged out", fg="red")
 
 
