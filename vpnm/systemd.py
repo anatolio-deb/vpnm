@@ -1,11 +1,6 @@
 import subprocess
 from typing import Iterable
 
-
-class SystemdRunError(BaseException):
-    pass
-
-
 CMD = [
     "systemd-run",
     "--user",
@@ -21,12 +16,9 @@ def run(command: Iterable) -> str:
 
     proc = subprocess.run(
         cmd,
-        check=False,
+        check=True,
         capture_output=True,
     )
-
-    if proc.returncode != 0:
-        raise SystemdRunError(proc.stderr.decode())
 
     return proc.stderr.decode().split(":")[1].strip()
 

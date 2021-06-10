@@ -8,10 +8,10 @@ import socket
 import subprocess
 from typing import Tuple
 
+import systemd
+import web_api
 from sockets_framework import Session as Client
-
-from . import systemd, web_api
-from .utils import get_actual_address
+from utils import get_actual_address
 
 PRIVATE_NETWORKS = [
     "10.0.0.0/8",
@@ -154,7 +154,7 @@ class Connection:
         if mode:
             cmd.append(mode)
 
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, capture_output=True)
 
         with open(self.config, "r") as file:
             config = json.load(file)
@@ -162,13 +162,27 @@ class Connection:
         host = config["outbounds"][0]["settings"]["vnext"][0]["address"]
         address = socket.gethostbyname(host)
 
+        if address == "127.0.0.1":
+            raise ValueError(address)
+
         with Client(self.remote) as client:
             ifindex, ifaddr = client.commit("get_ifindex_and_ifaddr")
             ifindex, ifaddr = _get_ifindex_and_ifaddr(ifindex, ifaddr)
             metric, default_gateway_address = _get_default_gateway_with_metric(ifindex)
-            client.commit(
-                "add_node_route", address, default_gateway_address, metric - 1
-            )
+            node_address = client.commit("get_node_address")
+            unit = self.session.data.get("v2ray", "")
+
+            if node_address != address:
+                client.commit(
+                    "add_node_route", address, default_gateway_address, metric - 1
+                )
+                if systemd.is_active(unit):
+                    systemd.stop(unit)
+
+            if not systemd.is_active(unit):
+                unit = systemd.run(["v2ray", "-config", self.config])
+                self.session.data = {"v2ray": unit}
+
             client.commit("add_iface", ifindex, ifaddr)
             unit = self.session.data.get("tun2socks", "")
 
@@ -186,17 +200,6 @@ class Connection:
 
             client.commit("set_iface_up")
             client.commit("add_default_route", metric)
-
-            node_address = client.commit("get_node_address")
-
-            if address != node_address and systemd.is_active(unit):
-                systemd.stop(unit)
-
-            unit = self.session.data.get("v2ray", "")
-
-            if not systemd.is_active(unit):
-                unit = systemd.run(["v2ray", "-config", self.config])
-                self.session.data = {"v2ray": unit}
 
             unit = self.session.data.get("cloudflared", "")
 

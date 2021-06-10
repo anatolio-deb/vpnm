@@ -4,10 +4,10 @@ from subprocess import CalledProcessError
 
 import click
 import requests
+import vpnmd_api
+import web_api
 from requests.exceptions import HTTPError
-
-from . import vpnmd_api, web_api
-from .utils import get_actual_address
+from utils import get_actual_address
 
 
 @click.group()
@@ -21,14 +21,14 @@ def cli():
     "--email",
     prompt=web_api.get_prompt_desicion(),
     help="Registered email address",
-    # default="nikiforova693@gmail.com",
+    default="nikiforova693@gmail.com",
 )
 @click.option(
     "--password",
     prompt=web_api.get_prompt_desicion(),
     hide_input=True,
     help="Password provided at registration",
-    # default="xaswug-syVryc-huvfy9",
+    default="xaswug-syVryc-huvfy9",
 )
 def login(email: str, password: str):
     if web_api.get_prompt_desicion():
@@ -130,16 +130,23 @@ def connect(mode, ping):
         except ConnectionRefusedError:
             click.echo("Is vpnm daemon running?")
             click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
-        except (requests.exceptions.RequestException, CalledProcessError) as ex:
+        except requests.exceptions.RequestException as ex:
             if isinstance(ex, HTTPError):
                 click.secho(ex, fg="yellow")
             else:
                 click.secho("Can't connect to API", fg="red")
-        except OSError:
+        except CalledProcessError as ex:
+            click.secho(ex.stderr.decode(), fg="red")
+        except ValueError:
             click.secho(
                 "Consider changing your DNS or trying another node",
                 fg="yellow",
             )
+        except OSError as ex:
+            click.secho(ex, fg="red")
+        except KeyboardInterrupt:
+            click.echo("Ending the session properly, please wait...")
+            connection.stop()
         else:
             address = get_actual_address()
 
@@ -160,8 +167,8 @@ def disconnect():
     connection = vpnmd_api.Connection()
 
     try:
-        if connection.is_active():
-            connection.stop()
+        # if connection.is_active():
+        connection.stop()
     except ConnectionRefusedError:
         click.echo("Is vpnm daemon running?")
         click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")

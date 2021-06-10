@@ -4,7 +4,7 @@ import json
 
 import requests
 
-from .utils import AbstractPath
+from utils import AbstractPath
 
 
 class Secret(AbstractPath):
