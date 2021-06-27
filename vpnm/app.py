@@ -48,6 +48,7 @@ def login(email: str, password: str):
 
 @cli.command(help="Get the current connection status")
 def status():
+
     connection = vpnmd_api.Connection()
 
     try:
@@ -85,13 +86,14 @@ def account():
             pattern = re.compile(r"[\d.]*\d+")
             remaining = pattern.findall(auth.account.get("remaining_flow"))[0]
             total = auth.account.get("total_flow")
-            expire_date = datetime.datetime.fromtimestamp(
-                auth.account.get("expire_date")
-            ).strftime("%Y-%m-%d, %H:%M:%S")
+            days_left = str(
+                datetime.datetime.fromtimestamp(auth.account.get("expire_date"))
+                - datetime.datetime.now()
+            )
 
             click.echo(f"Current balance: {balance}")
             click.echo(f"Devices online: {online}/{limit}")
-            click.echo(f"Expire date: {expire_date}")
+            click.echo(f"Days left: {days_left}")
             click.echo(f"Traffic left: {remaining}/{total}")
     else:
         click.echo("Are you logged in?")
@@ -144,9 +146,9 @@ def connect(mode, ping):
             )
         except OSError as ex:
             click.secho(ex, fg="red")
-        except KeyboardInterrupt:
-            click.echo("Ending the session properly, please wait...")
-            connection.stop()
+        # except KeyboardInterrupt:
+        #     click.echo("Ending session properly, please wait...")
+        #     connection.stop()
         else:
             address = get_actual_address()
 

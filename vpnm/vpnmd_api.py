@@ -154,7 +154,10 @@ class Connection:
         if mode:
             cmd.append(mode)
 
-        subprocess.run(cmd, check=True, capture_output=True)
+        subprocess.run(cmd, check=True, capture_output=False)
+
+        if not mode:
+            subprocess.run(["clear"], check=True)
 
         with open(self.config, "r") as file:
             config = json.load(file)
