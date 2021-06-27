@@ -125,6 +125,7 @@ def connect(mode, ping):
     """Sends an IPC request to the VPNM daemon service"""
 
     if not web_api.get_prompt_desicion():
+
         connection = vpnmd_api.Connection()
 
         try:
