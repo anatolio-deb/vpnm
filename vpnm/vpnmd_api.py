@@ -8,10 +8,10 @@ import socket
 import subprocess
 from typing import Tuple
 
-import systemd
-import web_api
 from sockets_framework import Session as Client
-from utils import get_actual_address
+
+from vpnm import systemd, web_api
+from vpnm.utils import get_actual_address
 
 PRIVATE_NETWORKS = [
     "10.0.0.0/8",

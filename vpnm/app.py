@@ -4,10 +4,10 @@ from subprocess import CalledProcessError
 
 import click
 import requests
-import vpnmd_api
-import web_api
 from requests.exceptions import HTTPError
-from utils import get_actual_address
+
+from vpnm import vpnmd_api, web_api
+from vpnm.utils import get_actual_address
 
 
 @click.group()
@@ -21,14 +21,14 @@ def cli():
     "--email",
     prompt=web_api.get_prompt_desicion(),
     help="Registered email address",
-    default="nikiforova693@gmail.com",
+    # default="nikiforova693@gmail.com",
 )
 @click.option(
     "--password",
     prompt=web_api.get_prompt_desicion(),
     hide_input=True,
     help="Password provided at registration",
-    default="xaswug-syVryc-huvfy9",
+    # default="xaswug-syVryc-huvfy9",
 )
 def login(email: str, password: str):
     if web_api.get_prompt_desicion():
