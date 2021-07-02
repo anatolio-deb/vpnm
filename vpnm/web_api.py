@@ -39,9 +39,9 @@ def get_prompt_desicion():
 
 class Auth:
     apis = (
-        "https://ssle.ru/api/",
-        "https://ddnn.ru/api/",
-        "https://vm-vpnm.appspot.com/",
+        # "https://ssle.ru/api/",
+        # "https://ddnn.ru/api/",
+        # "https://vm-vpnm.appspot.com/",
         "https://ssle2.ru/api/",
     )
     _secret = Secret()

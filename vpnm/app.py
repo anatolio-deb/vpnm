@@ -170,8 +170,8 @@ def disconnect():
     connection = vpnmd_api.Connection()
 
     try:
-        # if connection.is_active():
-        connection.stop()
+        if connection.is_active():
+            connection.stop()
     except ConnectionRefusedError:
         click.echo("Is vpnm daemon running?")
         click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")

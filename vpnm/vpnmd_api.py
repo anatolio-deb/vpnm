@@ -8,7 +8,7 @@ import socket
 import subprocess
 from typing import Tuple
 
-from sockets_framework import Session as Client
+from anyd import ClientSession
 
 from vpnm import systemd, web_api
 from vpnm.utils import get_actual_address
@@ -25,7 +25,7 @@ PRIVATE_NETWORKS = [
 def _get_ifindex_and_ifaddr(ifindex: int, ifaddr: str) -> Tuple:
     proc = subprocess.run(["ip", "a"], check=True, capture_output=True)
 
-    if f"tun{ifindex}" and ifaddr in proc.stdout.decode() and ifaddr:
+    if ifindex and ifaddr and ifindex and ifaddr in proc.stdout.decode():
         return (ifindex, ifaddr)
 
     pattern = re.compile(r"tun\d*")
@@ -111,7 +111,7 @@ class Connection:
     address: str = ""
 
     def is_active(self):
-        with Client(self.remote) as client:
+        with ClientSession(self.remote) as client:
             node_address = client.commit("get_node_address")
 
         self.address = get_actual_address()
@@ -129,7 +129,7 @@ class Connection:
             if systemd.is_active(unit):
                 systemd.stop(unit)
 
-        with Client(self.remote) as client:
+        with ClientSession(self.remote) as client:
             client.commit("delete_iface")
             client.commit("delete_node_route")
             client.commit("delete_dns_rule")
@@ -168,7 +168,7 @@ class Connection:
         if address == "127.0.0.1":
             raise ValueError(address)
 
-        with Client(self.remote) as client:
+        with ClientSession(self.remote) as client:
             ifindex, ifaddr = client.commit("get_ifindex_and_ifaddr")
             ifindex, ifaddr = _get_ifindex_and_ifaddr(ifindex, ifaddr)
             metric, default_gateway_address = _get_default_gateway_with_metric(ifindex)

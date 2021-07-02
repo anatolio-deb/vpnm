@@ -14,22 +14,29 @@ LINKS = {
 BIN_PATH = "/usr/local/bin"
 DPATH = "/var/local/bin"
 SVC_PATH = "/etc/systemd/system"
+POST_DL = [
+    "install-release.sh",
+    "tun2socks-linux-amd64.zip",
+    "cloudflared-stable-linux-amd64.deb",
+    "v2gen_amd64_linux",
+]
 
 for link, filename in LINKS.items():
-    if filename in [
-        "install-release.sh",
-        "tun2socks-linux-amd64.zip",
-        "cloudflared-stable-linux-amd64.deb",
-    ]:
+    if filename in POST_DL:
         filepath = f"/tmp/{filename}"
 
-        if filename == "tun2socks-linux-amd64.zip":
+        if filename is POST_DL[0]:
+
+            def post_dl_act():
+                subprocess.run(["bash", "/tmp/install-release.sh"], check=True)
+
+        elif filename is POST_DL[1]:
 
             def post_dl_act():
                 with zipfile.ZipFile("/tmp/tun2socks-linux-amd64.zip", "r") as zip_ref:
                     zip_ref.extractall(BIN_PATH)
 
-        elif filename == "cloudflared-stable-linux-amd64.deb":
+        elif filename is POST_DL[2]:
 
             def post_dl_act():
                 subprocess.run(
@@ -40,7 +47,7 @@ for link, filename in LINKS.items():
         else:
 
             def post_dl_act():
-                subprocess.run(["bash", "/tmp/install-release.sh"], check=True)
+                subprocess.run(["chmod", "+", "x", BIN_PATH / POST_DL[-1]], check=True)
 
     elif filename == "vpnmd":
         filepath = f"{DPATH}/{filename}"
@@ -64,11 +71,7 @@ for link, filename in LINKS.items():
     else:
         print(f"Downloaded {filepath}")
 
-    if filename in [
-        "install-release.sh",
-        "tun2socks-linux-amd64.zip",
-        "cloudflared-stable-linux-amd64.deb",
-    ]:
+    if filename in POST_DL:
         post_dl_act()
 
 subprocess.run(["systemctl", "daemon-reload"], check=True)
