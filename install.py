@@ -28,35 +28,8 @@ for link in LINKS:
 
     if "." in filename:
         filepath = f"/tmp/{filename}"
-
-        if link is LINKS[0]:
-
-            def post_dl_act():
-                subprocess.run(["bash", filepath], check=True)
-
-        elif link is LINKS[1]:
-
-            def post_dl_act():
-                with zipfile.ZipFile(filepath, "r") as zip_ref:
-                    zip_ref.extractall(BIN_PATH)
-
-        else:
-
-            def post_dl_act():
-                subprocess.run(
-                    ["dpkg", "-i", filepath],
-                    check=True,
-                )
-
     else:
         filepath = f"{BIN_PATH}/{filename}"
-
-        if link is LINKS[3]:
-
-            def post_dl_act():
-                subprocess.run(["chmod", "+", "x", filepath], check=True)
-
-    print(f"Downloading {filename} from {link} to {filepath}")
 
     request = Request(link, headers={"User-Agent": "Mozilla/5.0"})
 
@@ -64,15 +37,18 @@ for link in LINKS:
         with open(filepath, "wb") as file:
             file.write(response.read())
 
-    if filename in LINKS[0]:
-        print(f"Installing v2ray from {filepath}")
-    elif filename in LINKS[1]:
-        print(f"Extracting {filepath} to {BIN_PATH}")
+    if link is LINKS[0]:
+        subprocess.run(["bash", filepath], check=True)
+    elif link is LINKS[1]:
+        with zipfile.ZipFile(filepath, "r") as zip_ref:
+            zip_ref.extractall(BIN_PATH)
+    elif link is LINKS[2]:
+        subprocess.run(
+            ["dpkg", "-i", filepath],
+            check=True,
+        )
     else:
-        print(f"Downloaded {filepath}")
-
-    if filename in LINKS[:4]:
-        post_dl_act()
+        subprocess.run(["chmod", "+", "x", filepath], check=True)
 
 with open("/etc/systemd/system/vpnmd.service", "w") as file:
     file.write(SERVICE)
@@ -80,3 +56,4 @@ with open("/etc/systemd/system/vpnmd.service", "w") as file:
 subprocess.run(["systemctl", "daemon-reload"], check=True)
 subprocess.run(["systemctl", "enable", "--now", "vpnmd"], check=True)
 subprocess.run(["vpnm"], check=True)
+
