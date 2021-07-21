@@ -1,0 +1,24 @@
+name: "install"
+
+on:
+  push:
+    branches:
+      - "main"
+
+jobs:
+  tagget-release:
+    name: "Install"
+    runs-on: "ubuntu-latest"
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Install dependencies"
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install pytest
+      - name: "Install"
+        run: |
+          python3 install.py
+      - name: "Test"
+        run: |
+          python3 -m pip pytest install_test.py -v

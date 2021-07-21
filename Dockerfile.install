@@ -1,0 +1,8 @@
+FROM ubuntu:bionic
+RUN apt update && apt install -y python3
+RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install pytest
+WORKDIR /code
+COPY install.py .
+COPY install_test.py .
+CMD ["pytest", "-v"]

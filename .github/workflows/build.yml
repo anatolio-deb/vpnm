@@ -22,6 +22,10 @@ jobs:
           pip install poetry
           poetry export -f requirements.txt --output requirements.txt
           pip install -r requirements.txt
+      - name: Lint with pylint
+        run: |
+          pip install pylint
+          pylint --max-line-length=88 --disable=C0114,C0116 --notes= vpnm/
       - name: "Build"
         run: |
           pip install pyinstaller
