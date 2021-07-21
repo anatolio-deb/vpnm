@@ -21,4 +21,4 @@ jobs:
           python3 install.py
       - name: "Test"
         run: |
-          python3 -m pip pytest install_test.py -v
+          python3 -m pytest install_test.py -v
