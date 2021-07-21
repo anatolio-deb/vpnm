@@ -49,6 +49,7 @@ def get_filename_from_link(link: str) -> str:
 
 def get_filepath_from_filename(filename: str) -> str:
     if "." in filename:
+<<<<<<< HEAD
         return f"/tmp/{filename}"
     return f"{BIN_PATH}/{filename}"
 
@@ -73,8 +74,12 @@ def get_post_download_action(link: str, filepath: str) -> Callable:
                 check=True,
             )
 
+=======
+        filepath = f"/tmp/{filename}"
+>>>>>>> de521bdc91f3ab23cb42c307af90c3739ada7437
     else:
 
+<<<<<<< HEAD
         def post_download_action():
             subprocess.run(["chmod", "+", "x", filepath], check=True)
 
@@ -82,12 +87,15 @@ def get_post_download_action(link: str, filepath: str) -> Callable:
 
 
 def download(link: str, filepath: str) -> None:
+=======
+>>>>>>> de521bdc91f3ab23cb42c307af90c3739ada7437
     request = Request(link, headers={"User-Agent": "Mozilla/5.0"})
 
     with urlopen(request) as response:
         with open(filepath, "wb") as file:
             file.write(response.read())
 
+<<<<<<< HEAD
 
 def post_process():
     with open(UNIT_PATH, "w") as file:
@@ -123,7 +131,28 @@ def main(testing=False):
             `vpnm --help`
             """
         )
+=======
+    if link is LINKS[0]:
+        subprocess.run(["bash", filepath], check=True)
+    elif link is LINKS[1]:
+        with zipfile.ZipFile(filepath, "r") as zip_ref:
+            zip_ref.extractall(BIN_PATH)
+    elif link is LINKS[2]:
+        subprocess.run(
+            ["dpkg", "-i", filepath],
+            check=True,
+        )
+    else:
+        subprocess.run(["chmod", "+", "x", filepath], check=True)
+>>>>>>> de521bdc91f3ab23cb42c307af90c3739ada7437
 
 
+<<<<<<< HEAD
 if __name__ == "__main__":
     main()
+=======
+subprocess.run(["systemctl", "daemon-reload"], check=True)
+subprocess.run(["systemctl", "enable", "--now", "vpnmd"], check=True)
+subprocess.run(["vpnm"], check=True)
+
+>>>>>>> de521bdc91f3ab23cb42c307af90c3739ada7437
