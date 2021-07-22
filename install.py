@@ -28,13 +28,6 @@ ExecStart=/usr/local/bin/vpnmd
 WantedBy=multi-user.target"""
 
 
-def check_process(process: Popen):
-    stdout = process.communicate()[0]
-
-    if process.returncode != 0:
-        raise RuntimeError(stdout)
-
-
 def get_filename_from_link(link: str) -> str:
     return link[-link[::-1].find("/") :]
 
@@ -50,7 +43,10 @@ def get_post_download_action(filename: str, filepath: str) -> Callable:
 
         def post_download_action():
             with Popen(["bash", filepath], stdout=PIPE, stderr=STDOUT) as process:
-                return process
+                stdout = process.communicate()[0]
+
+                if process.returncode != 0:
+                    raise RuntimeError(stdout)
 
     elif ".zip" in filename:
 
@@ -62,7 +58,10 @@ def get_post_download_action(filename: str, filepath: str) -> Callable:
 
         def post_download_action():
             with Popen(["dpkg", "-i", filepath], stdout=PIPE, stderr=STDOUT) as process:
-                return process
+                stdout = process.communicate()[0]
+
+                if process.returncode != 0:
+                    raise RuntimeError(stdout)
 
     else:
 
@@ -70,7 +69,10 @@ def get_post_download_action(filename: str, filepath: str) -> Callable:
             with Popen(
                 ["chmod", "+x", filepath], stdout=PIPE, stderr=STDOUT
             ) as process:
-                return process
+                stdout = process.communicate()[0]
+
+                if process.returncode != 0:
+                    raise RuntimeError(stdout)
 
     return post_download_action
 
@@ -88,12 +90,18 @@ def post_process():
         file.write(UNIT_CONTENT)
 
     with Popen(["systemctl", "daemon-reload"], stdout=PIPE, stderr=STDOUT) as process:
-        check_process(process)
+        stdout = process.communicate()[0]
+
+        if process.returncode != 0:
+            raise RuntimeError(stdout)
 
     with Popen(
         ["systemctl", "enable", "--now", "vpnmd"], stdout=PIPE, stderr=STDOUT
     ) as process:
-        check_process(process)
+        stdout = process.communicate()[0]
+
+        if process.returncode != 0:
+            raise RuntimeError(stdout)
 
 
 def downloader(link):
@@ -103,7 +111,7 @@ def downloader(link):
     download(link, filepath)
 
     if ".zip" not in filename:
-        check_process(post_download_action())
+        post_download_action()
 
 
 def process_links(testing: bool):
