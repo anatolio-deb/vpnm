@@ -6,7 +6,7 @@ from typing import Callable
 from urllib.request import Request, urlopen
 
 LINKS = [
-    "https://raw.githubusercontent.com/v2fly/fhs-install-v2ray/master/install-release.sh",
+    "https://github.com/v2ray/dist/raw/master/v2ray-linux-64.zip",
     "https://github.com/xjasonlyu/tun2socks/releases/download/v2.2.0/tun2socks-linux-amd64.zip",
     "https://bin.equinox.io/c/VdrWdbjqyF/cloudflared-stable-linux-amd64.deb",
     "https://github.com/iochen/v2gen/releases/download/v2.0.1/v2gen_amd64_linux",
@@ -39,16 +39,7 @@ def get_filepath_from_filename(filename: str) -> str:
 
 
 def get_post_download_action(filename: str, filepath: str) -> Callable:
-    if ".sh" in filename:
-
-        def post_download_action():
-            with Popen(["bash", filepath], stdout=PIPE, stderr=STDOUT) as process:
-                stdout = process.communicate()[0]
-
-                if process.returncode != 0:
-                    raise RuntimeError(stdout)
-
-    elif ".zip" in filename:
+    if ".zip" in filename:
 
         def post_download_action():
             with zipfile.ZipFile(filepath, "r") as zip_ref:

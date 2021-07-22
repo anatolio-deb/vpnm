@@ -1,4 +1,4 @@
-name: "pre-release"
+name: "latest-release"
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   tagget-release:
-    name: "Pre Release"
+    name: "Latest Release"
     runs-on: "ubuntu-latest"
 
     steps:
@@ -34,7 +34,7 @@ jobs:
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           automatic_release_tag: "latest"
-          prerelease: true
-          title: "Development build"
+          prerelease: false
+          title: "Latest build"
           files: |
             dist/vpnm
