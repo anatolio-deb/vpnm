@@ -7,7 +7,7 @@ An alternative [VPN Manager](https://vpn-m.com/) client for Linux CLI.
 **Caution**: only development version currently available.
 
 ```
-curl -sSL https://raw.githubusercontent.com/anatolio-deb/vpnm/main/install.py | sudo python -
+curl -sSL https://raw.githubusercontent.com/anatolio-deb/vpnm/main/install.py | sudo python3 -
 ```
 
 ## Dependencies
