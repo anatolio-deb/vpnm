@@ -208,7 +208,12 @@ class Connection:
 
             if not systemd.is_active(unit):
                 unit = systemd.run(
-                    ["cloudflared", "proxy-dns", "--port", str(self.dns_port)],
+                    [
+                        "cloudflared-linux-amd64",
+                        "proxy-dns",
+                        "--port",
+                        str(self.dns_port),
+                    ],
                 )
                 self.session.data = {"cloudflared": unit}
 
