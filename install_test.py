@@ -11,8 +11,8 @@ class TestClass01(TestCase):
         install.main(testing=True)
 
     def test_case01(self):
-        """Files are downladed and present on the filesystem"""
-        for link in install.LINKS:
+        """Files are downloaded and present on the filesystem"""
+        for link in install.LINKS[1:]:
             filepath = install.get_filepath_from_filename(
                 install.get_filename_from_link(link)
             )
