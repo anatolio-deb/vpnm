@@ -1,8 +1,9 @@
+import argparse
 import json
 import zipfile
-from http.client import IncompleteRead
+from pathlib import Path
 from string import Template
-from subprocess import PIPE, STDOUT, Popen, TimeoutExpired
+from subprocess import PIPE, STDOUT, Popen
 from threading import Thread
 from typing import Any, Callable, Tuple
 from urllib.request import Request, urlopen
@@ -65,21 +66,9 @@ class Downloader:
     github_api = GitHubAPI()
     urls = github_api.browser_download_urls
     urls.append("https://github.com/v2ray/dist/raw/master/v2ray-linux-64.zip")
-    bin_path = "/usr/local/bin"
+    bin_path = Path("/usr/local/bin/vpnm/")
     tmp_path = "/tmp"
     threads: list = []
-    unit_path = "/etc/systemd/system/vpnmd.service"
-    unit_content = """[Unit]
-Description=VPN Manager daemon
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Restart=on-failure
-ExecStart=/usr/local/bin/vpnmd
-
-[Install]
-WantedBy=multi-user.target"""
 
     @staticmethod
     def chmod(filepath: str):
@@ -94,10 +83,10 @@ WantedBy=multi-user.target"""
             zip_ref.extractall(self.bin_path)
 
     @staticmethod
-    def get_filename_from_url(url: str) -> str:
+    def get_filename(url: str) -> str:
         return url[-url[::-1].find("/") :]
 
-    def get_filepath_from_filename(
+    def get_filepath_and_callback(
         self, filename: str
     ) -> Tuple[str, Callable[[str], Any]]:
         if ".zip" in filename:
@@ -117,8 +106,8 @@ WantedBy=multi-user.target"""
 
     def process_urls(self):
         for url in self.urls:
-            filename = self.get_filename_from_url(url)
-            filepath, callback = self.get_filepath_from_filename(filename)
+            filename = self.get_filename(url)
+            filepath, callback = self.get_filepath_and_callback(filename)
             request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
             thread = Thread(
                 target=self.download,
@@ -134,9 +123,32 @@ WantedBy=multi-user.target"""
         for thread in self.threads:
             thread.join()
 
-        self.post_process()
+    def run(self):
 
-    def post_process(self):
+        if self.bin_path.exists() and not self.bin_path.is_dir():
+            self.bin_path.unlink()
+
+        if not self.bin_path.exists():
+            self.bin_path.mkdir()
+
+        self.process_urls()
+
+
+class Installer:
+    unit_path = "/etc/systemd/system/vpnmd.service"
+    unit_content = """[Unit]
+Description=VPN Manager daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Restart=on-failure
+ExecStart=/usr/local/bin/vpnmd
+
+[Install]
+WantedBy=multi-user.target"""
+
+    def install(self):
         with open(self.unit_path, "w") as file:
             file.write(self.unit_content)
 
@@ -156,7 +168,42 @@ WantedBy=multi-user.target"""
             if process.returncode != 0:
                 raise RuntimeError(stdout)
 
-    def runner(self):
+    def uninstall(self):
+        with Popen(
+            ["systemctl", "disable", "--now", "vpnmd"], stdout=PIPE, stderr=STDOUT
+        ) as process:
+            stdout = process.communicate()[0]
+
+            if process.returncode != 0:
+                raise RuntimeError(stdout)
+
+        with Popen(["rm", self.unit_path], stdout=PIPE, stderr=STDOUT) as process:
+            stdout = process.communicate()[0]
+
+            if process.returncode != 0:
+                raise RuntimeError(stdout)
+
+        with Popen(
+            ["rm", "-r", "-f", Downloader.bin_path], stdout=PIPE, stderr=STDOUT
+        ) as process:
+            stdout = process.communicate()[0]
+
+            if process.returncode != 0:
+                raise RuntimeError(stdout)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--uninstall", action="store_true", default=False)
+    args = parser.parse_args()
+
+    installer = Installer()
+
+    if args.uninstall:
+        print("Removing VPN Manager")
+        installer.uninstall()
+    else:
+        downloader = Downloader()
         print(
             f"""Welcome to VPN Manager!
 
@@ -165,27 +212,17 @@ an alternative CLI client for VPN Manager.
 
 It will add the `vpnm` command to system's bin directory, located at:
 
-{self.bin_path}
+{downloader.bin_path}
 
 You can uninstall at any time by executing this script with the --uninstall option,
 and these changes will be reverted."""
         )
-
-        try:
-            self.process_urls()
-            self.post_process()
-        except (ConnectionError, RuntimeError, TimeoutExpired, IncompleteRead) as ex:
-            print(ex)
-        else:
-            print(
-                """VPN Manager is installed now. Great!
+        downloader.run()
+        installer.install()
+        print(
+            """VPN Manager is installed now. Great!
 
 You can test that everything is set up by executing:
 
 `vpnm --help`"""
-            )
-
-
-if __name__ == "__main__":
-    downloader = Downloader()
-    downloader.runner()
+        )
