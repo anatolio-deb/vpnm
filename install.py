@@ -5,7 +5,7 @@ from pathlib import Path
 from string import Template
 from subprocess import PIPE, STDOUT, Popen
 from threading import Thread
-from typing import Any, Callable, Tuple
+from typing import Tuple
 from urllib.request import Request, urlopen
 
 
@@ -74,24 +74,37 @@ class Downloader:
     def get_filename(url: str) -> str:
         return url[-url[::-1].find("/") :]
 
-    def download(self, request: Request, filepath: str):
+    def get_filepath_and_callback(self, filename: str) -> Tuple:
+        def unzip(filepath: str):
+            with zipfile.ZipFile(filepath, "r") as zip_ref:
+                zip_ref.extractall(self.bin_path)
+
+        if self.tmp_path and ".zip" in filename:
+            return (f"{self.tmp_path}/{filename}", unzip)
+        return (f"{self.bin_path}/{filename}", None)
+
+    @staticmethod
+    def download(request: Request, filepath: str, callback=None):
 
         with urlopen(request) as response:
             with open(filepath, "wb") as file:
                 file.write(response.read())
 
-        if self.tmp_path and ".zip" in filepath:
-            with zipfile.ZipFile(filepath, "r") as zip_ref:
-                zip_ref.extractall(self.bin_path)
+        if callback is not None:
+            callback(filepath)
 
     def process_urls(self):
         for url in self.urls:
             filename = self.get_filename(url)
-            filepath = f"{self.tmp_path}/{filename}"
+            filepath, callback = self.get_filepath_and_callback(filename)
             request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
             thread = Thread(
                 target=self.download,
-                args=(request, filepath),
+                args=(
+                    request,
+                    filepath,
+                    callback,
+                ),
             )
             thread.start()
             self.threads.append(thread)
