@@ -71,51 +71,27 @@ class Downloader:
     threads: list = []
 
     @staticmethod
-    def chmod(filepath: str):
-        with Popen(["chmod", "+x", filepath], stdout=PIPE, stderr=STDOUT) as process:
-            stdout = process.communicate()[0]
-
-            if process.returncode != 0:
-                raise RuntimeError(stdout)
-
-    def unzip(self, filepath: str):
-        with zipfile.ZipFile(filepath, "r") as zip_ref:
-            zip_ref.extractall(self.bin_path)
-
-    @staticmethod
     def get_filename(url: str) -> str:
         return url[-url[::-1].find("/") :]
 
-    def get_filepath_and_callback(
-        self, filename: str
-    ) -> Tuple[str, Callable[[str], Any]]:
-        if ".zip" in filename:
-            return (f"{self.tmp_path}/{filename}", self.unzip)
-
-        return (f"{self.bin_path}/{filename}", self.chmod)
-
-    @staticmethod
-    def download(request: Request, filepath: str, callback=None):
+    def download(self, request: Request, filepath: str):
 
         with urlopen(request) as response:
             with open(filepath, "wb") as file:
                 file.write(response.read())
 
-        if callback is not None:
-            callback(filepath)
+        if self.tmp_path and ".zip" in filepath:
+            with zipfile.ZipFile(filepath, "r") as zip_ref:
+                zip_ref.extractall(self.bin_path)
 
     def process_urls(self):
         for url in self.urls:
             filename = self.get_filename(url)
-            filepath, callback = self.get_filepath_and_callback(filename)
+            filepath = f"{self.tmp_path}/{filename}"
             request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
             thread = Thread(
                 target=self.download,
-                args=(
-                    request,
-                    filepath,
-                    callback,
-                ),
+                args=(request, filepath),
             )
             thread.start()
             self.threads.append(thread)
@@ -143,7 +119,7 @@ Wants=network-online.target
 
 [Service]
 Restart=on-failure
-ExecStart=/usr/local/bin/vpnmd
+ExecStart=/usr/local/bin/vpnm/vpnmd
 
 [Install]
 WantedBy=multi-user.target"""
@@ -162,6 +138,14 @@ WantedBy=multi-user.target"""
 
         with Popen(
             ["systemctl", "enable", "--now", "vpnmd"], stdout=PIPE, stderr=STDOUT
+        ) as process:
+            stdout = process.communicate()[0]
+
+            if process.returncode != 0:
+                raise RuntimeError(stdout)
+
+        with Popen(
+            ["chmod", "-R", "ugo+rx", Downloader.bin_path], stdout=PIPE, stderr=STDOUT
         ) as process:
             stdout = process.communicate()[0]
 

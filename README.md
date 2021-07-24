@@ -4,8 +4,6 @@ An alternative [VPN Manager](https://vpn-m.com/) client for Linux CLI.
 
 # **Installation**
 
-**Caution**: only development version currently available.
-
 ```
 curl -sSL https://raw.githubusercontent.com/anatolio-deb/vpnm/main/install.py | sudo python3 -
 ```
@@ -19,6 +17,12 @@ curl -sSL https://raw.githubusercontent.com/anatolio-deb/vpnm/main/install.py | 
 - [v2ray-core](https://github.com/v2ray/v2ray-core) — to be free
 - netfilter/iptables
 - iproute2
+
+## Uninstall
+
+```
+curl -sSL https://raw.githubusercontent.com/anatolio-deb/vpnm/main/install.py | sudo python3 - --uninstall
+```
 
 # Testing
 
