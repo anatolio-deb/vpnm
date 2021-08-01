@@ -192,7 +192,7 @@ WantedBy=multi-user.target"""
         ]
         paths = [Path(f"{Downloader.bin_path}/{filename}") for filename in filenames]
 
-        paths.extend(self.unit_path)
+        paths.extend(Path(self.unit_path))
 
         for path in paths:
             if path.exists() and path.is_file():
