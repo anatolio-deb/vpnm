@@ -66,8 +66,8 @@ class Downloader:
     github_api = GitHubAPI()
     urls = github_api.browser_download_urls
     urls.append("https://github.com/v2ray/dist/raw/master/v2ray-linux-64.zip")
-    bin_path = Path("/usr/local/bin/")
-    tmp_path = "/tmp"
+    bin_path = Path("/usr/local/bin")
+    tmp_path = Path("/tmp")
     threads: list = []
 
     @staticmethod
@@ -89,7 +89,7 @@ class Downloader:
                         if member.filename == target:
                             zip_ref.extract(member, self.bin_path)
 
-                if not Path(f"{self.bin_path}/{target}").exists():
+                if not (self.bin_path / target).exists():
                     raise FileNotFoundError(f"{target} is not found in {filepath}")
             else:
                 with zipfile.ZipFile(filepath, "r") as zip_ref:
@@ -97,7 +97,7 @@ class Downloader:
 
                 with zipfile.ZipFile(filepath, "r") as zip_ref:
                     for member in zip_ref.infolist():
-                        if not Path(f"{self.bin_path}/{member.filename}").exists():
+                        if not (self.bin_path / member.filename).exists():
                             raise FileNotFoundError(
                                 f"{member.filename} is not extraced"
                             )
@@ -112,8 +112,8 @@ class Downloader:
                     raise RuntimeError(stdout)
 
         if self.tmp_path and ".zip" in filename:
-            return (f"{self.tmp_path}/{filename}", unzip)
-        return (f"{self.bin_path}/{filename}", chmod)
+            return (self.tmp_path / filename, unzip)
+        return (self.bin_path / filename, chmod)
 
     @staticmethod
     def download(request: Request, filepath: str, callback=None):
@@ -149,7 +149,7 @@ class Downloader:
 
 
 class Installer:
-    unit_path = "/etc/systemd/system/vpnmd.service"
+    unit_path = Path("/etc/systemd/system/vpnmd.service")
     unit_content = """[Unit]
 Description=VPN Manager daemon
 After=network-online.target
@@ -199,9 +199,9 @@ WantedBy=multi-user.target"""
             "vpnm",
             "vpnmd",
         ]
-        paths = [Path(f"{Downloader.bin_path}/{filename}") for filename in filenames]
+        paths = [Downloader.bin_path / filename for filename in filenames]
 
-        paths.extend(Path(self.unit_path))
+        paths.extend(self.unit_path)
 
         for path in paths:
             if path.exists() and path.is_file():
