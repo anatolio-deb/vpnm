@@ -2,7 +2,6 @@ import argparse
 import json
 import zipfile
 from pathlib import Path
-from string import Template
 from subprocess import PIPE, STDOUT, Popen
 from threading import Thread
 from typing import Tuple
@@ -15,9 +14,7 @@ class GitHubAPI:
 
     @staticmethod
     def _get_api_request_urls() -> list:
-        api_request_template = Template(
-            "https://api.github.com/repos/$user/$repository/releases/latest"
-        )
+        api_request_template = "https://api.github.com/repos/{}/{}/releases/latest"
         metadata = [
             ("xjasonlyu", "tun2socks"),
             ("cloudflare", "cloudflared"),
@@ -27,7 +24,7 @@ class GitHubAPI:
         ]
 
         return [
-            api_request_template.substitute(user=user, repository=repository)
+            api_request_template.format(user, repository)
             for user, repository in metadata
         ]
 
@@ -162,7 +159,7 @@ ExecStart=/usr/local/bin/vpnmd
 [Install]
 WantedBy=multi-user.target"""
     install_commands = ["systemctl daemon-reload", "systemctl enable --now vpnmd"]
-    uninstall_commands = ["systemctl disable --now vpnmd", Template("rm $filepath")]
+    uninstall_commands = ["systemctl disable --now vpnmd", "rm {}"]
     filenames = [
         "cloudflared-linux-amd64",
         "tun2socks-linux-amd64",
@@ -187,7 +184,7 @@ WantedBy=multi-user.target"""
             else:
                 for path in self.paths.extend(self.unit_path):
                     if path.exists() and path.is_file():
-                        Downloader.run(command.substitute(filepath=path).split())
+                        Downloader.run(command.format(path).split())
 
 
 if __name__ == "__main__":
