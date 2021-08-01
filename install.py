@@ -71,6 +71,15 @@ class Downloader:
     threads: list = []
 
     @staticmethod
+    def run(command: list):
+        """Run a shell command"""
+        with Popen(command, stdout=PIPE, stderr=STDOUT) as process:
+            stdout = process.communicate()[0]
+
+            if process.returncode != 0:
+                raise RuntimeError(stdout)
+
+    @staticmethod
     def get_filename(url: str) -> str:
         return url[-url[::-1].find("/") :]
 
@@ -102,31 +111,22 @@ class Downloader:
                                 f"{member.filename} is not extraced"
                             )
 
-        def chmod(filepath: str):
-            with Popen(
-                ["chmod", "ugo+x", filepath], stdout=PIPE, stderr=STDOUT
-            ) as process:
-                stdout = process.communicate()[0]
-
-                if process.returncode != 0:
-                    raise RuntimeError(stdout)
-
         if self.tmp_path and ".zip" in filename:
             return (self.tmp_path / filename, unzip)
-        return (self.bin_path / filename, chmod)
+        return (self.bin_path / filename, self.run)
 
-    @staticmethod
-    def download(request: Request, filepath: str, callback=None):
+    def download(self, request: Request, filepath: str, callback=None):
 
         with urlopen(request) as response:
             with open(filepath, "wb") as file:
                 file.write(response.read())
 
-        if callback is not None:
-            if "v2ray" in filepath:
-                callback(filepath, "v2ray")
-            else:
-                callback(filepath)
+        if callback is self.run:
+            callback(["chmod", "ugo+x", filepath])
+        elif "v2ray" in filepath:
+            callback(filepath, "v2ray")
+        else:
+            callback(filepath)
 
     def process_urls(self):
         for url in self.urls:
@@ -161,55 +161,33 @@ ExecStart=/usr/local/bin/vpnmd
 
 [Install]
 WantedBy=multi-user.target"""
+    install_commands = ["systemctl daemon-reload", "systemctl enable --now vpnmd"]
+    uninstall_commands = ["systemctl disable --now vpnmd", Template("rm $filepath")]
+    filenames = [
+        "cloudflared-linux-amd64",
+        "tun2socks-linux-amd64",
+        "v2gen_amd64_linux",
+        "v2ray",
+        "vpnm",
+        "vpnmd",
+    ]
+    paths = [Downloader.bin_path / filename for filename in filenames]
 
     def install(self):
         with open(self.unit_path, "w") as file:
             file.write(self.unit_content)
 
-        with Popen(
-            ["systemctl", "daemon-reload"], stdout=PIPE, stderr=STDOUT
-        ) as process:
-            stdout = process.communicate()[0]
-
-            if process.returncode != 0:
-                raise RuntimeError(stdout)
-
-        with Popen(
-            ["systemctl", "enable", "--now", "vpnmd"], stdout=PIPE, stderr=STDOUT
-        ) as process:
-            stdout = process.communicate()[0]
-
-            if process.returncode != 0:
-                raise RuntimeError(stdout)
+        for command in self.install_commands:
+            Downloader.run(command.split())
 
     def uninstall(self):
-        with Popen(
-            ["systemctl", "disable", "--now", "vpnmd"], stdout=PIPE, stderr=STDOUT
-        ) as process:
-            stdout = process.communicate()[0]
-
-            if process.returncode != 0:
-                raise RuntimeError(stdout)
-
-        filenames = [
-            "cloudflared-linux-amd64",
-            "tun2socks-linux-amd64",
-            "v2gen_amd64_linux",
-            "v2ray",
-            "vpnm",
-            "vpnmd",
-        ]
-        paths = [Downloader.bin_path / filename for filename in filenames]
-
-        paths.extend(self.unit_path)
-
-        for path in paths:
-            if path.exists() and path.is_file():
-                with Popen(["rm", path], stdout=PIPE, stderr=STDOUT) as process:
-                    stdout = process.communicate()[0]
-
-                    if process.returncode != 0:
-                        raise RuntimeError(stdout)
+        for command in self.uninstall_commands:
+            if command is self.uninstall_commands[0]:
+                Downloader.run(command.split())
+            else:
+                for path in self.paths.extend(self.unit_path):
+                    if path.exists() and path.is_file():
+                        Downloader.run(command.substitute(filepath=path).split())
 
 
 if __name__ == "__main__":
