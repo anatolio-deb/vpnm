@@ -95,6 +95,13 @@ class Downloader:
                 with zipfile.ZipFile(filepath, "r") as zip_ref:
                     zip_ref.extractall(self.bin_path)
 
+                with zipfile.ZipFile(filepath, "r") as zip_ref:
+                    for member in zip_ref.infolist():
+                        if not Path(f"{self.bin_path}/{member.filename}").exists():
+                            raise FileNotFoundError(
+                                f"{member.filename} is not extraced"
+                            )
+
         def chmod(filepath: str):
             with Popen(
                 ["chmod", "ugo+x", filepath], stdout=PIPE, stderr=STDOUT
