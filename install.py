@@ -138,16 +138,6 @@ class Downloader:
         for thread in self.threads:
             thread.join()
 
-    def run(self):
-
-        if self.bin_path.exists() and not self.bin_path.is_dir():
-            self.bin_path.unlink()
-
-        if not self.bin_path.exists():
-            self.bin_path.mkdir()
-
-        self.process_urls()
-
 
 class Installer:
     unit_path = "/etc/systemd/system/vpnmd.service"
@@ -238,7 +228,7 @@ It will add the `vpnm` command to system's bin directory, located at:
 You can uninstall at any time by executing this script with the --uninstall option,
 and these changes will be reverted."""
         )
-        downloader.run()
+        downloader.process_urls()
         installer.install()
         print(
             """VPN Manager is installed now. Great!
