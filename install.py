@@ -82,15 +82,17 @@ class Downloader:
                 filepath (str): The location of a zip file
                 target (str, optional): The exact file to extract. Defaults to None.
             """
-            with zipfile.ZipFile(filepath, "r") as zip_ref:
-                if target is not None:
+
+            if target is not None:
+                with zipfile.ZipFile(filepath, "r") as zip_ref:
                     for member in zip_ref.infolist():
                         if member.filename == target:
                             zip_ref.extract(member, self.bin_path)
 
-                    if not Path(f"{self.bin_path}/{target}").exists():
-                        raise FileNotFoundError(f"{target} is not found in {filepath}")
-                else:
+                if not Path(f"{self.bin_path}/{target}").exists():
+                    raise FileNotFoundError(f"{target} is not found in {filepath}")
+            else:
+                with zipfile.ZipFile(filepath, "r") as zip_ref:
                     zip_ref.extractall(self.bin_path)
 
         def chmod(filepath: str):
