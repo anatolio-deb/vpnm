@@ -93,7 +93,9 @@ class Downloader:
 
             with zipfile.ZipFile(filepath, "r") as zip_ref:
                 for member in zip_ref.infolist():
-                    if member.filename == target:
+                    if member.filename == target and not (
+                        self.bin_path / member.filename
+                        ).exists():
                         zip_ref.extract(member, self.bin_path)
 
             if not (self.bin_path / target).exists():
@@ -103,23 +105,33 @@ class Downloader:
             return (self.tmp_path / filename, unzip)
         return (self.bin_path / filename, self.run)
 
-    def download(self, request: Request, filepath: str, callback: FunctionType):
+    def download(self, request: Request, filepath: Path, callback: FunctionType):
 
-        with urlopen(request) as response:
-            with open(filepath, "wb") as file:
-                file.write(response.read())
+        if self.tmp_path and ".zip" in filepath.as_posix() and filepath.exists():
+            try:
+                with zipfile.ZipFile(filepath, "r") as zip_ref:
+                    zip_ref.close()
+            except zipfile.BadZipFile:
+                filepath.unlink()
+
+        if not filepath.exists():
+            with urlopen(request) as response:
+                with open(filepath, "wb") as file:
+                    file.write(response.read())
         
         if callback is not self.run:
-            if "v2ray-linux-64.zip" in filepath:
+            if "v2ray-linux-64.zip" in filepath.as_posix():
                 callback(filepath, "v2ray")
+                callback(filepath, "geoip.dat")
+                callback(filepath, "geosite.dat")
                 filepath = self.bin_path / "v2ray"
             else:
                 callback(filepath, "tun2socks-linux-amd64")
                 filepath = self.bin_path / "tun2socks-linux-amd64"
             callback = self.run
         
-        if callback is self.run:
-            callback(["chmod", "ugo+x", filepath])
+        if callback is self.run and not filepath.exists():
+            callback(["chmod", "ugo+x", filepath.as_posix()])
 
     def process_urls(self):
         for url in self.urls:
@@ -130,7 +142,7 @@ class Downloader:
                 target=self.download,
                 args=(
                     request,
-                    filepath.as_posix(),
+                    filepath,
                     callback,
                 ),
             )
@@ -163,6 +175,8 @@ WantedBy=multi-user.target"""
         "v2ray",
         "vpnm",
         "vpnmd",
+        "geoip.dat",
+        "geosite.dat",
     ]
     paths = [Downloader.bin_path / filename for filename in filenames]
 
