@@ -82,50 +82,43 @@ class Downloader:
         return url[-url[::-1].find("/") :]
 
     def get_filepath_and_callback(self, filename: str) -> Tuple[Path, FunctionType]:
-        def unzip(filepath: str, target: str = None):
+        def unzip(filepath: str, target: str):
             """Extract the whole zip archive or an exact file from it.
 
             Args:
                 filepath (str): The location of a zip file
                 target (str, optional): The exact file to extract. Defaults to None.
             """
-
-            if target is not None:
-                with zipfile.ZipFile(filepath, "r") as zip_ref:
-                    for member in zip_ref.infolist():
-                        if member.filename == target:
-                            zip_ref.extract(member, self.bin_path)
-
-                if not (self.bin_path / target).exists():
-                    raise FileNotFoundError(f"{target} is not found in {filepath}")
-            else:
-                with zipfile.ZipFile(filepath, "r") as zip_ref:
-                    zip_ref.extractall(self.bin_path)
-
-                with zipfile.ZipFile(filepath, "r") as zip_ref:
-                    for member in zip_ref.infolist():
-                        if not (self.bin_path / member.filename).exists():
-                            raise FileNotFoundError(
-                                f"{member.filename} is not extraced"
-                            )
+            
+            with zipfile.ZipFile(filepath, "r") as zip_ref:
+                for member in zip_ref.infolist():
+                    if member.filename == target:
+                        zip_ref.extract(member, self.bin_path)
+                
+            if not (self.bin_path / target).exists():
+                raise FileNotFoundError(f"{target} is not found in {filepath}")
 
         if self.tmp_path and ".zip" in filename:
             return (self.tmp_path / filename, unzip)
         return (self.bin_path / filename, self.run)
 
-    def download(self, request: Request, filepath: str, callback=None):
+    def download(self, request: Request, filepath: str, callback: FunctionType):
 
         with urlopen(request) as response:
             with open(filepath, "wb") as file:
                 file.write(response.read())
 
-        if callback is self.run:
-            callback(["chmod", "ugo+x", filepath])
-        elif "v2ray" in filepath:
+        if "v2ray" in filepath:
             callback(filepath, "v2ray")
-        else:
-            callback(filepath)
+        elif "tun2socks-linux-amd64" in filepath:
+            callback(filepath, "tun2socks-linux-amd64")
+        
+        if callback is not self.run:
+            callback = self.run
 
+        callback(["chmod", "ugo+rx", filepath])
+        
+        
     def process_urls(self):
         for url in self.urls:
             filename = self.get_filename(url)
