@@ -188,7 +188,8 @@ WantedBy=multi-user.target"""
             if command is self.uninstall_commands[0]:
                 Downloader.run(command.split())
             else:
-                for path in self.paths.extend(self.unit_path):
+                self.paths.append(self.unit_path)
+                for path in self.paths:
                     if path.exists() and path.is_file():
                         Downloader.run(command.format(path).split())
 
