@@ -3,10 +3,11 @@ import json
 from types import FunctionType
 import zipfile
 from pathlib import Path
-from subprocess import PIPE, STDOUT, Popen
+from subprocess import PIPE, STDOUT, Popen, SubprocessError
 from threading import Thread
 from typing import Tuple
 from urllib.request import Request, urlopen
+from colorama import init, Fore
 
 
 class GitHubAPI:
@@ -75,7 +76,7 @@ class Downloader:
             stdout = process.communicate()[0]
 
             if process.returncode != 0:
-                raise RuntimeError(stdout)
+                raise SubprocessError(stdout.decode())
 
     @staticmethod
     def get_filename(url: str) -> str:
@@ -90,7 +91,6 @@ class Downloader:
                 target (str, optional): The exact file to extract. Defaults to None.
             """
 
-            # if target is not None:
             with zipfile.ZipFile(filepath, "r") as zip_ref:
                 for member in zip_ref.infolist():
                     if member.filename == target:
@@ -98,16 +98,6 @@ class Downloader:
 
             if not (self.bin_path / target).exists():
                 raise FileNotFoundError(f"{target} is not found in {filepath}")
-            # else:
-            #     with zipfile.ZipFile(filepath, "r") as zip_ref:
-            #         zip_ref.extractall(self.bin_path)
-
-            #     with zipfile.ZipFile(filepath, "r") as zip_ref:
-            #         for member in zip_ref.infolist():
-            #             if not (self.bin_path / member.filename).exists():
-            #                 raise FileNotFoundError(
-            #                     f"{member.filename} is not extraced"
-            #                 )
 
         if self.tmp_path and ".zip" in filename:
             return (self.tmp_path / filename, unzip)
@@ -186,15 +176,22 @@ WantedBy=multi-user.target"""
     def uninstall(self):
         for command in self.uninstall_commands:
             if command is self.uninstall_commands[0]:
-                Downloader.run(command.split())
+                try:
+                    Downloader.run(command.split())
+                except SubprocessError as ex:
+                    print(ex)
             else:
                 self.paths.append(self.unit_path)
                 for path in self.paths:
                     if path.exists() and path.is_file():
-                        Downloader.run(command.format(path).split())
+                        try:
+                            Downloader.run(command.format(path).split())
+                        except SubprocessError as ex:
+                            print(ex)
 
 
 if __name__ == "__main__":
+    init()
     parser = argparse.ArgumentParser()
     parser.add_argument("--uninstall", action="store_true", default=False)
     args = parser.parse_args()
@@ -202,29 +199,33 @@ if __name__ == "__main__":
     installer = Installer()
 
     if args.uninstall:
-        print("Removing VPN Manager")
+        print(Fore.CYAN + "Removing VPN Manager")
         installer.uninstall()
     else:
         downloader = Downloader()
-        print(
-            f"""Welcome to VPN Manager!
 
-This will download and install the latest version of vpnm,
-an alternative CLI client for VPN Manager.
-
-It will add the `vpnm` command to system's bin directory, located at:
-
-{downloader.bin_path}
-
-You can uninstall at any time by executing this script with the --uninstall option,
-and these changes will be reverted."""
-        )
+        print("Welcome to" + Fore.CYAN + " VPN Manager!" + Fore.RESET)
+        print()
+        print("This will download and install the latest version of" + Fore.CYAN + " vpnm" + Fore.RESET)
+        print("an alternative CLI client for" + Fore.CYAN + " VPN Manager." + Fore.RESET)
+        print()
+        print("It will add the `vpnm` command to system's bin directory, located at:")
+        print(Fore.CYAN + downloader.bin_path.as_posix() + Fore.RESET)
+        print()
+        print("You can uninstall at any time by executing this script with the --uninstall option,")
+        print("and these changes will be reverted.")
+        print()
+        print(Fore.CYAN + "Retrieving dependencies..." + Fore.RESET)
+        print()
+        
         downloader.process_urls()
+        
+        print(Fore.CYAN + "Installing VPN Manager..." + Fore.RESET)
+        print()
+
         installer.install()
-        print(
-            """VPN Manager is installed now. Great!
 
-You can test that everything is set up by executing:
-
-`vpnm --help`"""
-        )
+        print(Fore.CYAN + "VPN Manager is installed now. Great!" + Fore.RESET)
+        print()
+        print("You can test that everything is set up by executing:")
+        print("`vpnm --help`")
