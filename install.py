@@ -10,6 +10,14 @@ from urllib.request import Request, urlopen
 
 
 class GitHubAPI:
+    filenames = [
+                "tun2socks-linux-amd64.zip",
+                "cloudflared-linux-amd64",
+                "v2gen_amd64_linux",
+                "vpnm",
+                "vpnmd",
+            ]
+
     def __init__(self) -> None:
         self.browser_download_urls = self._get_browser_download_urls()
 
@@ -38,13 +46,7 @@ class GitHubAPI:
 
     def _get_asset(self, api_request_url: str) -> dict:
         for asset in self._get_json_response(api_request_url)["assets"]:
-            if asset["name"] in [
-                "tun2socks-linux-amd64.zip",
-                "cloudflared-linux-amd64",
-                "v2gen_amd64_linux",
-                "vpnm",
-                "vpnmd",
-            ]:
+            if asset["name"] in self.filenames:
                 return asset
 
         raise KeyError("Asset not found")
@@ -67,7 +69,9 @@ class Downloader:
     bin_path = Path("/usr/local/bin")
     tmp_path = Path("/tmp")
     threads: list = []
-
+    filenames = GitHubAPI.filenames
+    filenames.append("v2ray")
+    
     @staticmethod
     def run(command: list):
         """Run a shell command"""
@@ -89,7 +93,7 @@ class Downloader:
                 filepath (str): The location of a zip file
                 target (str, optional): The exact file to extract. Defaults to None.
             """
-            
+
             with zipfile.ZipFile(filepath, "r") as zip_ref:
                 for member in zip_ref.infolist():
                     if member.filename == target:
@@ -108,11 +112,10 @@ class Downloader:
             with open(filepath, "wb") as file:
                 file.write(response.read())
 
-        if "v2ray" in filepath:
-            callback(filepath, "v2ray")
-        elif "tun2socks-linux-amd64" in filepath:
-            callback(filepath, "tun2socks-linux-amd64")
-        
+        for filename in self.filenames:
+            if filename in filepath:
+                callback(filepath, filename)
+
         if callback is not self.run:
             callback = self.run
 
@@ -154,15 +157,7 @@ ExecStart=/usr/local/bin/vpnmd
 WantedBy=multi-user.target"""
     install_commands = ["systemctl daemon-reload", "systemctl enable --now vpnmd"]
     uninstall_commands = ["systemctl disable --now vpnmd", "rm {}"]
-    filenames = [
-        "cloudflared-linux-amd64",
-        "tun2socks-linux-amd64",
-        "v2gen_amd64_linux",
-        "v2ray",
-        "vpnm",
-        "vpnmd",
-    ]
-    paths = [Downloader.bin_path / filename for filename in filenames]
+    paths = [Downloader.bin_path / filename for filename in Downloader.filenames]
 
     def install(self):
         with open(self.unit_path, "w") as file:
