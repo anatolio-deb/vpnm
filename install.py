@@ -1,5 +1,6 @@
 import argparse
 import json
+from types import FunctionType
 import zipfile
 from pathlib import Path
 from subprocess import PIPE, STDOUT, Popen
@@ -80,7 +81,7 @@ class Downloader:
     def get_filename(url: str) -> str:
         return url[-url[::-1].find("/") :]
 
-    def get_filepath_and_callback(self, filename: str) -> Tuple:
+    def get_filepath_and_callback(self, filename: str) -> Tuple[Path, FunctionType]:
         def unzip(filepath: str, target: str = None):
             """Extract the whole zip archive or an exact file from it.
 
@@ -134,7 +135,7 @@ class Downloader:
                 target=self.download,
                 args=(
                     request,
-                    filepath,
+                    filepath.as_posix(),
                     callback,
                 ),
             )
