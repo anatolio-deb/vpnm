@@ -1,13 +1,13 @@
-name: "latest-release"
+name: "tagged-release"
 
 on:
   push:
-    branches:
-      - "main"
+    tags:
+      - "v*"
 
 jobs:
   tagget-release:
-    name: "Latest Release"
+    name: "Tagged Release"
     runs-on: "ubuntu-18.04"
 
     steps:
@@ -33,7 +33,6 @@ jobs:
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "latest"
           prerelease: false
           title: "Latest build"
           files: |

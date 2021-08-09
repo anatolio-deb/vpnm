@@ -10,15 +10,16 @@ from urllib.request import Request, urlopen
 class GitHubAPI:
     filenames = [
         "tun2socks-linux-amd64.zip",
+        "v2ray-linux-64.zip",
         "cloudflared-linux-amd64",
         "v2gen_amd64_linux",
-        "vpnm",
         "vpnmd",
+        "vpnm",
     ]
-    urls: dict = {}
+    data: dict = {}
 
     def __init__(self) -> None:
-        self._set_browser_download_urls()
+        self._set_data()
 
     @staticmethod
     def _get_api_request_urls() -> list:
@@ -27,6 +28,7 @@ class GitHubAPI:
             ("xjasonlyu", "tun2socks"),
             ("cloudflare", "cloudflared"),
             ("iochen", "v2gen"),
+            ("v2fly", "v2ray-core"),
             ("anatolio-deb", "vpnmd"),
             ("anatolio-deb", "vpnm"),
         ]
@@ -43,28 +45,17 @@ class GitHubAPI:
         with urlopen(request) as response:
             return json.loads(response.read().decode("utf-8"))
 
-    def _get_asset(self, api_request_url: str) -> dict:
-        for asset in self._get_json_response(api_request_url)["assets"]:
-            if asset["name"] in self.filenames:
-                return asset
-
-        raise KeyError("Asset not found")
-
-    @staticmethod
-    def _get_browser_download_url(asset: dict):
-        return asset.get("browser_download_url")
-
-    def _set_browser_download_urls(self):
-        for url in self._get_api_request_urls():
-            asset = self._get_asset(url)
-            self.urls[asset["name"]] = self._get_browser_download_url(asset)
+    def _set_data(self):
+        for response in self._get_api_request_urls():
+            if response["asset"]["name"] in self.filenames:
+                self.data[response["asset"]["name"]] = {
+                    "url": response["asset"]["browser_download_url"],
+                    "version": response["tag_name"],
+                }
 
 
 class Downloader:
     github_api = GitHubAPI()
-    github_api.urls[
-        "v2ray-linux-64.zip"
-    ] = "https://github.com/v2ray/dist/raw/master/v2ray-linux-64.zip"
     bin_path = Path("/usr/local/bin")
     tmp_path = Path("/tmp")
     threads: list = []
@@ -79,7 +70,9 @@ class Downloader:
             if process.returncode != 0:
                 raise SubprocessError(stdout.decode())
 
-    def download(self, request: Request, filename: str):
+        return stdout.decode()
+
+    def download(self, request: Request, filename: str, version: str):
         def unzip(filepath: Path, target: str):
             """Extract the whole zip archive or an exact file from it.
 
@@ -90,48 +83,67 @@ class Downloader:
 
             with zipfile.ZipFile(filepath, "r") as zip_ref:
                 for member in zip_ref.infolist():
-                    if (
-                        member.filename == target
-                        and not (self.bin_path / member.filename).exists()
-                    ):
+                    if member.filename == target:
                         zip_ref.extract(member, self.bin_path)
 
-        with urlopen(request) as response:
+        _filename = ""
 
-            if "zip" in filename:
+        if filename == "tun2socks-linux-amd64.zip":
+            _filename = self.filenames[0]
 
+            def callback(filepath: Path) -> None:
+                unzip(filepath, self.filenames[0])
+
+        elif filename == "v2ray-linux-64.zip":
+            _filename = self.filenames[1]
+
+            def callback(filepath: Path) -> None:
+                for member in self.filenames[1:]:
+                    unzip(filepath, member)
+                    self.run(["chmod", "ugo+r", (self.bin_path / member).as_posix()])
+
+        else:
+
+            def callback(filepath: Path) -> None:
+                self.run(["chmod", "ugo+x", filepath.as_posix()])
+
+        if not _filename:
+            filepath = self.bin_path / filename
+        else:
+            filepath = self.bin_path / _filename
+
+        if filename == GitHubAPI.filenames[3]:
+            cmd = "-v"
+        else:
+            cmd = "--version"
+
+        stdout = ""
+
+        if filepath.exists():
+            stdout = self.run([filepath.as_posix(), cmd])
+
+        if version not in stdout:
+
+            if _filename:
                 filepath = self.tmp_path / filename
 
+            with urlopen(request) as response:
                 with open(filepath, "wb") as file:
                     file.write(response.read())
 
-                if "v2ray" in filename:
-
-                    filename = self.filenames[1]
-
-                    for member in self.filenames[1:]:
-                        unzip(filepath, member)
-                        self.run(
-                            ["chmod", "ugo+r", (self.bin_path / member).as_posix()]
-                        )
-                else:
-                    filename = self.filenames[0]
-                    unzip(filepath, filename)
-            else:
-
-                with open(self.bin_path / filename, "wb") as file:
-                    file.write(response.read())
-
-            self.run(["chmod", "ugo+x", (self.bin_path / filename).as_posix()])
+            callback(filepath)
 
     def process_urls(self):
-        for filename, url in self.github_api.urls.items():
+        for filename, data in self.github_api.data.items():
+            url = data["url"]
+            version = data["version"]
             request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
             thread = Thread(
                 target=self.download,
                 args=(
                     request,
                     filename,
+                    version,
                 ),
             )
             thread.start()
@@ -150,15 +162,15 @@ Wants=network-online.target
 
 [Service]
 Restart=on-failure
-ExecStart={Downloader.bin_path}/{GitHubAPI.filenames[-1]}
+ExecStart={Downloader.bin_path.as_posix()}/{GitHubAPI.filenames[-2]}
 
 [Install]
 WantedBy=multi-user.target"""
     install_commands = [
         "systemctl daemon-reload",
-        f"systemctl enable --now {GitHubAPI.filenames[-1]}",
+        f"systemctl enable --now {GitHubAPI.filenames[-2]}",
     ]
-    uninstall_commands = [f"systemctl disable --now {GitHubAPI.filenames[-1]}", "rm {}"]
+    uninstall_commands = [f"systemctl disable --now {GitHubAPI.filenames[-2]}", "rm {}"]
     paths = [
         Downloader.bin_path / filename
         for filename in GitHubAPI.filenames + Downloader.filenames

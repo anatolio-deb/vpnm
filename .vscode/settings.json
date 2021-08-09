@@ -16,7 +16,7 @@
     ],
     "python.linting.pylintArgs": [
         "--max-line-length=88",
-        "--disable=C0114,C0116,R0912,W0107",
+        "--disable=C0115,C0114,C0116,W0107,R0914,R0912",
         "--notes= "
     ]
 }

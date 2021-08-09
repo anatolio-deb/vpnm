@@ -6,11 +6,13 @@ import click
 import requests
 from requests.exceptions import HTTPError
 
-from vpnm import vpnmd_api, web_api
+from vpnm import __version__, vpnmd_api, web_api
 from vpnm.utils import get_actual_address, get_location
 
 
 @click.group()
+@click.version_option(__version__, prog_name="vpnm")
+# @click.pass_context
 def cli():
     """VPN Manager - secure internet access"""
     pass
