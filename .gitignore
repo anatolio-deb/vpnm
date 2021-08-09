@@ -1,6 +1,3 @@
 __pycache__
 .mypy_cache
-dist
-build
-*.spec
 .pytest_cache

@@ -1,16 +1,23 @@
 import argparse
 import json
-from types import FunctionType
 import zipfile
 from pathlib import Path
 from subprocess import PIPE, STDOUT, Popen, SubprocessError
 from threading import Thread
-from typing import Tuple
 from urllib.request import Request, urlopen
 from colorama import init, Fore
 
 
 class GitHubAPI:
+    filenames = [
+                "tun2socks-linux-amd64.zip",
+                "cloudflared-linux-amd64",
+                "v2gen_amd64_linux",
+                "vpnm",
+                "vpnmd",
+            ]
+    urls = {}
+
     def __init__(self) -> None:
         self.browser_download_urls = self._get_browser_download_urls()
 
@@ -39,13 +46,7 @@ class GitHubAPI:
 
     def _get_asset(self, api_request_url: str) -> dict:
         for asset in self._get_json_response(api_request_url)["assets"]:
-            if asset["name"] in [
-                "tun2socks-linux-amd64.zip",
-                "cloudflared-linux-amd64",
-                "v2gen_amd64_linux",
-                "vpnm",
-                "vpnmd",
-            ]:
+            if asset["name"] in self.filenames:
                 return asset
 
         raise KeyError("Asset not found")
@@ -55,19 +56,18 @@ class GitHubAPI:
         return asset.get("browser_download_url")
 
     def _get_browser_download_urls(self) -> list:
-        return [
-            self._get_browser_download_url(self._get_asset(url))
-            for url in self._get_api_request_urls()
-        ]
+        for url in self._get_api_request_urls():
+            asset = self._get_asset(url)
+            self.urls[asset["name"]] = self._get_browser_download_url(asset)
 
 
 class Downloader:
     github_api = GitHubAPI()
-    urls = github_api.browser_download_urls
-    urls.append("https://github.com/v2ray/dist/raw/master/v2ray-linux-64.zip")
+    github_api.urls["v2ray-linux-64.zip"] = "https://github.com/v2ray/dist/raw/master/v2ray-linux-64.zip"
     bin_path = Path("/usr/local/bin")
     tmp_path = Path("/tmp")
     threads: list = []
+    filenames = ["tun2socks-linux-amd64", "v2ray", 'geoip.dat', 'geosite.dat']
 
     @staticmethod
     def run(command: list):
@@ -78,11 +78,8 @@ class Downloader:
             if process.returncode != 0:
                 raise SubprocessError(stdout.decode())
 
-    @staticmethod
-    def get_filename(url: str) -> str:
-        return url[-url[::-1].find("/") :]
+    def download(self, request: Request, filename: str):
 
-    def get_filepath_and_callback(self, filename: str) -> Tuple[Path, FunctionType]:
         def unzip(filepath: str, target: str):
             """Extract the whole zip archive or an exact file from it.
 
@@ -98,52 +95,41 @@ class Downloader:
                         ).exists():
                         zip_ref.extract(member, self.bin_path)
 
-            if not (self.bin_path / target).exists():
-                raise FileNotFoundError(f"{target} is not found in {filepath}")
+        with urlopen(request) as response:
 
-        if self.tmp_path and ".zip" in filename:
-            return (self.tmp_path / filename, unzip)
-        return (self.bin_path / filename, self.run)
+            if 'zip' in filename:
 
-    def download(self, request: Request, filepath: Path, callback: FunctionType):
+                filepath = self.tmp_path / filename
 
-        if self.tmp_path and ".zip" in filepath.as_posix() and filepath.exists():
-            try:
-                with zipfile.ZipFile(filepath, "r") as zip_ref:
-                    zip_ref.close()
-            except zipfile.BadZipFile:
-                filepath.unlink()
-
-        if not filepath.exists():
-            with urlopen(request) as response:
                 with open(filepath, "wb") as file:
                     file.write(response.read())
-        
-        if callback is not self.run:
-            if "v2ray-linux-64.zip" in filepath.as_posix():
-                callback(filepath, "v2ray")
-                callback(filepath, "geoip.dat")
-                callback(filepath, "geosite.dat")
-                filepath = self.bin_path / "v2ray"
+
+                if 'v2ray' in filename:
+                    
+                    filename = self.filenames[1]
+
+                    for member in self.filenames[1: ]:
+                        unzip(filepath, member)
+                        self.run(["chmod",  "ugo+r", (self.bin_path / member).as_posix()])
+                else:
+                    filename = self.filenames[0]
+                    unzip(filepath, filename)
             else:
-                callback(filepath, "tun2socks-linux-amd64")
-                filepath = self.bin_path / "tun2socks-linux-amd64"
-            callback = self.run
-        
-        if callback is self.run and not filepath.exists():
-            callback(["chmod", "ugo+x", filepath.as_posix()])
+
+                with open(self.bin_path / filename, "wb") as file:
+                    file.write(response.read())
+            
+            self.run(["chmod", "ugo+x", (self.bin_path / filename).as_posix()])
+            
 
     def process_urls(self):
-        for url in self.urls:
-            filename = self.get_filename(url)
-            filepath, callback = self.get_filepath_and_callback(filename)
+        for filename, url in self.github_api.urls.items():
             request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
             thread = Thread(
                 target=self.download,
                 args=(
                     request,
-                    filepath,
-                    callback,
+                    filename,
                 ),
             )
             thread.start()
@@ -155,30 +141,20 @@ class Downloader:
 
 class Installer:
     unit_path = Path("/etc/systemd/system/vpnmd.service")
-    unit_content = """[Unit]
+    unit_content = f"""[Unit]
 Description=VPN Manager daemon
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Restart=on-failure
-ExecStart=/usr/local/bin/vpnmd
+ExecStart={Downloader.bin_path}/{GitHubAPI.filenames[-1]}
 
 [Install]
 WantedBy=multi-user.target"""
-    install_commands = ["systemctl daemon-reload", "systemctl enable --now vpnmd"]
-    uninstall_commands = ["systemctl disable --now vpnmd", "rm {}"]
-    filenames = [
-        "cloudflared-linux-amd64",
-        "tun2socks-linux-amd64",
-        "v2gen_amd64_linux",
-        "v2ray",
-        "vpnm",
-        "vpnmd",
-        "geoip.dat",
-        "geosite.dat",
-    ]
-    paths = [Downloader.bin_path / filename for filename in filenames]
+    install_commands = ["systemctl daemon-reload", f"systemctl enable --now {GitHubAPI.filenames[-1]}"]
+    uninstall_commands = [f"systemctl disable --now {GitHubAPI.filenames[-1]}", "rm {}"]
+    paths = [Downloader.bin_path / filename for filename in GitHubAPI.filenames + Downloader.filenames]
 
     def install(self):
         with open(self.unit_path, "w") as file:
@@ -196,6 +172,7 @@ WantedBy=multi-user.target"""
                     print(ex)
             else:
                 self.paths.append(self.unit_path)
+                
                 for path in self.paths:
                     if path.exists() and path.is_file():
                         try:
@@ -213,17 +190,18 @@ if __name__ == "__main__":
     installer = Installer()
 
     if args.uninstall:
-        print(Fore.CYAN + "Removing VPN Manager")
+        print(Fore.CYAN + "Removing VPN Manager"  + Fore.RESET)
         installer.uninstall()
     else:
         downloader = Downloader()
 
         print("Welcome to" + Fore.CYAN + " VPN Manager!" + Fore.RESET)
         print()
-        print("This will download and install the latest version of" + Fore.CYAN + " vpnm" + Fore.RESET)
+        print("This will download and install the latest version of" + Fore.CYAN + " vpnm," + Fore.RESET)
         print("an alternative CLI client for" + Fore.CYAN + " VPN Manager." + Fore.RESET)
         print()
         print("It will add the `vpnm` command to system's bin directory, located at:")
+        print()
         print(Fore.CYAN + downloader.bin_path.as_posix() + Fore.RESET)
         print()
         print("You can uninstall at any time by executing this script with the --uninstall option,")
