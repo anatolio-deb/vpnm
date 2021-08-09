@@ -1,9 +1,17 @@
-"""Run the systemd transient services"""
 import os
 import pathlib
 from abc import ABCMeta, abstractmethod
 
 import requests
+
+
+def get_location(address: str) -> dict:
+    try:
+        response = requests.get(f"http://ip-api.com/json/{address}")
+    except requests.exceptions.RequestException:
+        return {}
+    else:
+        return response.json()
 
 
 def get_actual_address() -> str:

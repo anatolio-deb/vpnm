@@ -7,7 +7,7 @@ import requests
 from requests.exceptions import HTTPError
 
 from vpnm import vpnmd_api, web_api
-from vpnm.utils import get_actual_address
+from vpnm.utils import get_actual_address, get_location
 
 
 @click.group()
@@ -152,8 +152,16 @@ def connect(mode, ping):
         #     connection.stop()
         else:
             address = get_actual_address()
+            location = get_location(address)
+            city = location.get("city")
+            country = location.get("country")
 
-            click.secho(f"Connected to {address}", fg="green")
+            if city and country:
+                location = ", " + city + ", " + country
+            else:
+                location = ""
+
+            click.secho(f"Connected to {address}{location}", fg="green")
 
             if address != connection.address:
                 click.secho(
