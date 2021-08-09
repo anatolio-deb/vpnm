@@ -1,0 +1,22 @@
+{
+    "python.pythonPath": "/home/anatolio/.cache/pypoetry/virtualenvs/vpnm-_x2ZAj_n-py3.9",
+    "python.formatting.provider": "black",
+    "python.testing.pytestEnabled": true,
+    "python.testing.autoTestDiscoverOnSaveEnabled": true,
+    "python.linting.pylintEnabled": true,
+    "python.linting.mypyEnabled": true,
+    "python.linting.lintOnSave": true,
+    "python.linting.enabled": true,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": true
+    },
+    "python.formatting.blackArgs": [
+        "--line-length=88"
+    ],
+    "python.linting.pylintArgs": [
+        "--max-line-length=88",
+        "--disable=C0114,C0116",
+        "--notes= "
+    ]
+}
