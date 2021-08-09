@@ -1,6 +1,6 @@
 # vpnm
 
-An alternative [VPN Manager](https://vpn-m.com/) client for Linux CLI.
+An alternative [VPN Manager](https://vpnm.org/) client for Linux CLI.
 
 # **Installation**
 
