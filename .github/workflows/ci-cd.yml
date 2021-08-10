@@ -1,4 +1,4 @@
-name: "tagged-release"
+name: "CI/CD"
 
 on:
   push:
@@ -24,7 +24,6 @@ jobs:
       run: |
         pip install pylint
         pylint --max-line-length=88 --disable=C0115,C0114,C0116,W0107,R0914,R0912 --notes= vpnm/
-    - uses: "marvinpinto/action-automatic-releases@latest"
   release:
     runs-on: ubuntu-18.04
     needs: qa
