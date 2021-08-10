@@ -28,3 +28,11 @@ build-backend = "poetry.core.masonry.api"
 [tool.isort]
 profile = "black"
 
+[tool.semantic_release]
+version_variable = [
+    'vpnm/__init__.py:__version__',
+]
+version_toml = [
+    'pyproject.toml:tool.poetry.version',
+]
+build_command = "pyinstaller -F -n vpnm --clean vpnm/app.py"

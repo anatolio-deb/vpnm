@@ -2,38 +2,37 @@ name: "tagged-release"
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
 
 jobs:
-  tagget-release:
-    name: "Tagged Release"
-    runs-on: "ubuntu-18.04"
-
+  qa:
+    runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
-      - name: "Set up python3.9"
-        uses: actions/setup-python@v2
-        with:
-          python-version: 3.9
-      - name: "Install dependencies"
-        run: |
-          python3 -m pip install --upgrade pip
-          pip install poetry
-          poetry export -f requirements.txt --output requirements.txt
-          pip install -r requirements.txt
-      - name: Lint with pylint
-        run: |
-          pip install pylint
-          pylint --max-line-length=88 --disable=C0115,C0114,C0116,W0107,R0914,R0912 --notes= vpnm/
-      - name: "Build"
-        run: |
-          pip install pyinstaller
-          pyinstaller -F -n vpnm --clean vpnm/app.py
-      - uses: "marvinpinto/action-automatic-releases@latest"
-        with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          prerelease: false
-          title: "Latest build"
-          files: |
-            dist/vpnm
+    - uses: actions/checkout@v2
+    - name: interpreter
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+    - name: requirements
+      run: |
+        python -m pip install --upgrade pip
+        pip install poetry
+        poetry export -f requirements.txt --output requirements.txt
+        pip install -r requirements.txt
+    - name: linting
+      run: |
+        pip install pylint
+        pylint --max-line-length=88 --disable=C0115,C0114,C0116,W0107,R0914,R0912 --notes= vpnm/
+    - uses: "marvinpinto/action-automatic-releases@latest"
+  release:
+    runs-on: ubuntu-18.04
+    needs: qa
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        fetch-depth: 0
+    - name: release
+      uses: relekang/python-semantic-release@master
+      with:
+        github_token: ${{ secrets.PYPI_TOKEN }}

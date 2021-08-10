@@ -19,10 +19,10 @@ class GitHubAPI:
     data: dict = {}
 
     def __init__(self) -> None:
-        self._set_data()
+        self.set_data()
 
     @staticmethod
-    def _get_api_request_urls() -> list:
+    def get_api_request_urls() -> list:
         api_request_template = "https://api.github.com/repos/{}/{}/releases/latest"
         metadata = [
             ("xjasonlyu", "tun2socks"),
@@ -39,19 +39,22 @@ class GitHubAPI:
         ]
 
     @staticmethod
-    def _get_json_response(api_request_url: str) -> dict:
+    def get_json_response(api_request_url: str) -> dict:
         request = Request(api_request_url, headers={"User-Agent": "Mozilla/5.0"})
 
         with urlopen(request) as response:
             return json.loads(response.read().decode("utf-8"))
 
-    def _set_data(self):
-        for response in self._get_api_request_urls():
-            if response["asset"]["name"] in self.filenames:
-                self.data[response["asset"]["name"]] = {
-                    "url": response["asset"]["browser_download_url"],
-                    "version": response["tag_name"],
-                }
+    def set_data(self):
+        for url in self.get_api_request_urls():
+            response = self.get_json_response(url)
+
+            for asset in response["assets"]:
+                if asset["name"] in self.filenames:
+                    self.data[asset["name"]] = {
+                        "url": asset["browser_download_url"],
+                        "version": response["tag_name"],
+                    }
 
 
 class Downloader:
@@ -59,7 +62,7 @@ class Downloader:
     bin_path = Path("/usr/local/bin")
     tmp_path = Path("/tmp")
     threads: list = []
-    filenames = ["tun2socks-linux-amd64", "v2ray", "geoip.dat", "geosite.dat"]
+    members = ["tun2socks-linux-amd64", "v2ray", "geoip.dat", "geosite.dat"]
 
     @staticmethod
     def run(command: list):
@@ -72,66 +75,81 @@ class Downloader:
 
         return stdout.decode()
 
-    def download(self, request: Request, filename: str, version: str):
-        def unzip(filepath: Path, target: str):
-            """Extract the whole zip archive or an exact file from it.
+    def unzip(self, filepath: Path, member: str):
+        """Extract the whole zip archive or an exact file from it.
 
-            Args:
-                filepath (str): The location of a zip file
-                target (str, optional): The exact file to extract. Defaults to None.
-            """
+        Args:
+            filepath (str): The location of a zip file
+            member (str, optional): The exact file to extract. Defaults to None.
+        """
 
-            with zipfile.ZipFile(filepath, "r") as zip_ref:
-                for member in zip_ref.infolist():
-                    if member.filename == target:
-                        zip_ref.extract(member, self.bin_path)
+        with zipfile.ZipFile(filepath, "r") as zip_ref:
+            for _member in zip_ref.infolist():
+                if _member.filename == member:
+                    zip_ref.extract(_member, self.bin_path)
 
-        _filename = ""
+    def get_members(self, filename: str) -> list:
+        if filename == GitHubAPI.filenames[0]:
+            return self.members[:1]
 
-        if filename == "tun2socks-linux-amd64.zip":
-            _filename = self.filenames[0]
+        if filename == GitHubAPI.filenames[1]:
+            return self.members[1:]
 
-            def callback(filepath: Path) -> None:
-                unzip(filepath, self.filenames[0])
+        return []
 
-        elif filename == "v2ray-linux-64.zip":
-            _filename = self.filenames[1]
-
-            def callback(filepath: Path) -> None:
-                for member in self.filenames[1:]:
-                    unzip(filepath, member)
-                    self.run(["chmod", "ugo+r", (self.bin_path / member).as_posix()])
-
-        else:
-
-            def callback(filepath: Path) -> None:
-                self.run(["chmod", "ugo+x", filepath.as_posix()])
-
-        if not _filename:
-            filepath = self.bin_path / filename
-        else:
-            filepath = self.bin_path / _filename
-
-        if filename == GitHubAPI.filenames[3]:
-            cmd = "-v"
-        else:
-            cmd = "--version"
-
+    def get_local_version(self, filepath: Path, cmd: str = "--version") -> str:
         stdout = ""
 
         if filepath.exists():
+
+            if filepath is self.bin_path / GitHubAPI.filenames[3]:
+                cmd = "-v"
+
             stdout = self.run([filepath.as_posix(), cmd])
 
-        if version not in stdout:
+        return stdout
 
-            if _filename:
+    def download(self, request: Request, filename: str, version: str):
+        members = self.get_members(filename)
+
+        if members:
+            filepath = self.bin_path / members[0]
+        else:
+            filepath = self.bin_path / filename
+
+        local_version = self.get_local_version(filepath)
+
+        if version not in local_version:
+            if members:
                 filepath = self.tmp_path / filename
 
             with urlopen(request) as response:
                 with open(filepath, "wb") as file:
                     file.write(response.read())
 
-            callback(filepath)
+            def callback(filepath: Path, members: list, flag: str = "x") -> None:
+                _filepath = filepath
+                remember = ""
+
+                for member in members:
+                    self.unzip(filepath, member)
+
+                    if member in self.members[2:]:
+                        flag = "r"
+
+                    remember = member
+                    break
+
+                if remember:
+                    _filepath = self.bin_path / remember
+                    members.remove(remember)
+
+                self.run(["chmod", f"ugo+{flag}", _filepath.as_posix()])
+
+                if members:
+                    callback(filepath, members)
+
+            callback(filepath, members)
 
     def process_urls(self):
         for filename, data in self.github_api.data.items():
@@ -157,15 +175,15 @@ class Installer:
     unit_path = Path("/etc/systemd/system/vpnmd.service")
     unit_content = f"""[Unit]
 Description=VPN Manager daemon
-After=network-online.target
-Wants=network-online.target
+After=network-online.member
+Wants=network-online.member
 
 [Service]
 Restart=on-failure
 ExecStart={Downloader.bin_path.as_posix()}/{GitHubAPI.filenames[-2]}
 
 [Install]
-WantedBy=multi-user.target"""
+WantedBy=multi-user.member"""
     install_commands = [
         "systemctl daemon-reload",
         f"systemctl enable --now {GitHubAPI.filenames[-2]}",
@@ -173,40 +191,63 @@ WantedBy=multi-user.target"""
     uninstall_commands = [f"systemctl disable --now {GitHubAPI.filenames[-2]}", "rm {}"]
     paths = [
         Downloader.bin_path / filename
-        for filename in GitHubAPI.filenames + Downloader.filenames
+        for filename in GitHubAPI.filenames[2:] + Downloader.members
     ]
+
+    def __init__(self, verbosity: str) -> None:
+        self.verbosity = verbosity
 
     def install(self):
         with open(self.unit_path, "w") as file:
             file.write(self.unit_content)
 
         for command in self.install_commands:
-            Downloader.run(command.split())
+            try:
+                stdout = Downloader.run(command.split())
+            except SubprocessError as ex:
+                if self.verbosity == "error":
+                    print(ex)
+            else:
+                if self.verbosity == "info":
+                    print(stdout)
 
     def uninstall(self):
         for command in self.uninstall_commands:
             if command is self.uninstall_commands[0]:
                 try:
-                    Downloader.run(command.split())
+                    stdout = Downloader.run(command.split())
                 except SubprocessError as ex:
-                    print(ex)
+                    if self.verbosity == "error":
+                        print(ex)
+                else:
+                    if self.verbosity == "info":
+                        print(stdout)
             else:
                 self.paths.append(self.unit_path)
 
                 for path in self.paths:
                     if path.exists() and path.is_file():
                         try:
-                            Downloader.run(command.format(path).split())
+                            stdout = Downloader.run(
+                                command.format(path.as_posix()).split()
+                            )
                         except SubprocessError as ex:
-                            print(ex)
+                            if self.verbosity == "error":
+                                print(ex)
+                        else:
+                            if self.verbosity == "info":
+                                print(stdout)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--uninstall", action="store_true", default=False)
+    parser.add_argument(
+        "--verbosity", choices=["info", "error", "none"], default="none"
+    )
     args = parser.parse_args()
 
-    installer = Installer()
+    installer = Installer(args.verbosity)
 
     if args.uninstall:
         print("\x1b[36m" + "Removing VPN Manager" + "\x1b[39m")
@@ -231,7 +272,8 @@ if __name__ == "__main__":
         print("\x1b[36m" + downloader.bin_path.as_posix() + "\x1b[39m")
         print()
         print(
-            "You can uninstall at any time by executing this script with the --uninstall option,"
+            "You can uninstall at any time by executing this script with the "
+            " --uninstall option,"
         )
         print("and these changes will be reverted.")
         print()
@@ -240,12 +282,12 @@ if __name__ == "__main__":
 
         downloader.process_urls()
 
-        print("\x1b[36m" + "Installing VPN Manager..." + "\x1b[39m")
+        print("Installing" + "\x1b[36m" + "VPN Manager" + "\x1b[39m" + "...")
         print()
 
         installer.install()
 
-        print("\x1b[36m" + "VPN Manager is installed now. Great!" + "\x1b[39m")
+        print("\x1b[36m" + "VPN Manager" + "\x1b[39m" + "is installed now. Great!")
         print()
         print("You can test that everything is set up by executing:")
         print("`vpnm --help`")
