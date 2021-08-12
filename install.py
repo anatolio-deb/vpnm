@@ -1,8 +1,9 @@
 import argparse
 import json
+import subprocess
 import zipfile
 from pathlib import Path
-from subprocess import PIPE, STDOUT, Popen, SubprocessError
+from subprocess import PIPE, STDOUT, CalledProcessError, Popen, SubprocessError
 from threading import Thread
 from urllib.request import Request, urlopen
 
@@ -98,8 +99,6 @@ class Downloader:
         return []
 
     def get_local_version(self, filepath: Path, cmd: str = "--version") -> str:
-        stdout = ""
-
         if filepath.exists():
 
             if filepath in [
@@ -108,9 +107,12 @@ class Downloader:
             ]:
                 cmd = "-v"
 
-            stdout = self.run([filepath.as_posix(), cmd])
+            try:
+                return self.run([filepath.as_posix(), cmd])
+            except (PermissionError, OSError):
+                return ""
 
-        return stdout
+        return ""
 
     def download(self, request: Request, filename: str, version: str):
         members = self.get_members(filename)
@@ -127,8 +129,18 @@ class Downloader:
                 filepath = self.tmp_path / filename
 
             with urlopen(request) as response:
-                with open(filepath, "wb") as file:
-                    file.write(response.read())
+                while True:
+                    try:
+                        with open(filepath, "wb") as file:
+                            file.write(response.read())
+                    except OSError:
+                        if filename not in GitHubAPI.filenames[:2]:
+                            stdout = self.run(["pkill", filename])
+
+                            if stdout:
+                                print(stdout)
+                    else:
+                        break
 
             def callback(filepath: Path, members: list, flag: str = "x") -> None:
                 _filepath = filepath
@@ -156,15 +168,13 @@ class Downloader:
 
     def process_urls(self):
         for filename, data in self.github_api.data.items():
-            url = data["url"]
-            version = data["version"]
-            request = Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            request = Request(data["url"], headers={"User-Agent": "Mozilla/5.0"})
             thread = Thread(
                 target=self.download,
                 args=(
                     request,
                     filename,
-                    version,
+                    data["version"],
                 ),
             )
             thread.start()
