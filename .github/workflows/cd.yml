@@ -8,7 +8,7 @@ on:
       - main
 
 jobs:
-  qa:
+  cd:
     runs-on: ubuntu-18.04
     steps:
     - uses: actions/checkout@v2
@@ -25,7 +25,7 @@ jobs:
     - name: linting
       run: |
         pip install pylint
-        pylint --max-line-length=88 --disable=C0115,C0114,C0116,W0107,R0914,R0912 --notes= vpnm/
+        pylint --max-line-length=88 --disable=C0115,C0114,C0116,W0107,R0914,R0912,R0915 --notes= vpnm/
     - name: building
       run: |
         pip install pyinstaller
