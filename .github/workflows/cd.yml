@@ -27,9 +27,9 @@ jobs:
         pip install pylint
         pylint --max-line-length=88 --disable=C0115,C0114,C0116,W0107,R0914,R0912 --notes= vpnm/
     - name: building
-        run: |
-          pip install pyinstaller
-          pyinstaller -F -n vpnm --clean vpnm/app.py
+      run: |
+        pip install pyinstaller
+        pyinstaller -F -n vpnm --clean vpnm/app.py
     - uses: "marvinpinto/action-automatic-releases@latest"
       with:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
