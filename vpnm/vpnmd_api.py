@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ipaddress
 import json
-import pathlib
 import re
 import socket
 import subprocess
@@ -11,18 +10,17 @@ from typing import Tuple
 from anyd import ClientSession
 
 from vpnm import systemd, web_api
-from vpnm.utils import get_actual_address
-
-PRIVATE_NETWORKS = [
-    "10.0.0.0/8",
-    "100.64.0.0/10",
-    "172.16.0.0/12",
-    "192.0.0.0/24",
-    "198.18.0.0/15",
-]
+from vpnm.utils import JSONFileStorage, get_actual_address
 
 
-def _get_ifindex_and_ifaddr(ifindex: int, ifaddr: str) -> Tuple:
+def _get_ifindex_and_ifaddr(ifindex: int | None, ifaddr: str | None) -> Tuple:
+    private_networks = [
+        "10.0.0.0/8",
+        "100.64.0.0/10",
+        "172.16.0.0/12",
+        "192.0.0.0/24",
+        "198.18.0.0/15",
+    ]
     proc = subprocess.run(["ip", "a"], check=True, capture_output=True)
 
     if ifindex and ifaddr and ifindex and ifaddr in proc.stdout.decode():
@@ -41,7 +39,7 @@ def _get_ifindex_and_ifaddr(ifindex: int, ifaddr: str) -> Tuple:
     pattern = re.compile(r"\d*.\d*.\d*.\d*/\d*")
     nets = pattern.findall(proc.stdout.decode())
 
-    for network in PRIVATE_NETWORKS:
+    for network in private_networks:
         for subnet in ipaddress.IPv4Network(network).subnets():
             if subnet.exploded not in nets:
                 ifaddr = f"{subnet[2].exploded}/24"
@@ -72,67 +70,100 @@ def _get_default_gateway_with_metric(ifindex: str) -> Tuple:
     return (metric - 1, addresses[0])
 
 
-class Session(web_api.AbstractPath):
-    _data: dict = {}
-
-    @staticmethod
-    def get_file() -> pathlib.Path:
-        return web_api.AbstractPath.root / "session.json"
-
-    def __init__(self) -> None:
-        super().__init__()
-        if self.get_file().exists():
-            self._load_session()
-
-    def _load_session(self):
-        with self.get_file().open("r") as file:
-            self._data = json.load(file)
-
-    @property
-    def data(self) -> dict:
-        return self._data
-
-    @data.setter
-    def data(self, new_data: dict):
-        self.data.update(new_data)
-        with self.get_file().open("w") as file:
-            json.dump(self.data, file, indent=4, sort_keys=True)
-        self._load_session()
-
-
 class Connection:
+    session = JSONFileStorage("session")
+    settings = JSONFileStorage("settings")
+    settings["socks_port"] = settings.get("socks_port", "1080")
+    settings["dns_port"] = settings.get("dns_port", "1053")
+    settings["vpnmd_port"] = settings.get("vpnmd_port", 6554)
+    vpnmd_address = ("localhost", settings["vpnmd_port"])
     auth = web_api.Auth()
-    secret = web_api.Secret()
-    remote = ("localhost", 4000)
-    session = Session()
-    dns_port = 1053
-    socks_port = 1080
     config = "/tmp/config.json"
     address: str = ""
 
     def is_active(self):
-        with ClientSession(self.remote) as client:
-            node_address = client.commit("get_node_address")
-
+        node_address = self.session["node_address"]
         self.address = get_actual_address()
+        status = node_address == self.address
 
-        if node_address == self.address:
-            return True
-        return False
+        status = (
+            len(
+                list(
+                    filter(
+                        systemd.is_active,
+                        (
+                            unit
+                            for unit in [
+                                self.session.get(key, "")
+                                for key in self.session
+                                if key in ["v2ray", "cloudflared", "tun2socks"]
+                            ]
+                        ),
+                    )
+                )
+            )
+            > 0
+        )
+
+        if self.session:
+            try:
+                proc = subprocess.run(
+                    ["ip", "address", "show", f"tun{self.session['ifindex']}"],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError:
+                status = False
+            else:
+                status = self.session["ifaddr"] in proc.stdout.decode()
+
+            try:
+                proc = subprocess.run(
+                    ["ip", "link", "show", f"tun{self.session['ifindex']}"],
+                    check=True,
+                    capture_output=True,
+                )
+            except subprocess.CalledProcessError:
+                status = False
+            else:
+                status = "state UP" in proc.stdout.decode()
+
+            proc = subprocess.run(["ip", "route"], check=True, capture_output=True)
+            status = self.session["node_address"] in proc.stdout.decode()
+            proc = subprocess.run(["ip", "route"], check=True, capture_output=True)
+            status = f"default dev tun{self.session['ifindex']}" in proc.stdout.decode()
+
+            with ClientSession(self.vpnmd_address) as client:
+                status = client.commit(
+                    "iptables_rule_exists", self.settings["dns_port"]
+                )
+
+        return status
 
     def stop(self):
-        for unit in (
-            self.session.data.get("v2ray", ""),
-            self.session.data.get("tun2socks", ""),
-            self.session.data.get("cloudflared", ""),
-        ):
-            if systemd.is_active(unit):
-                systemd.stop(unit)
+        active_units = filter(
+            systemd.is_active,
+            (
+                unit
+                for unit in [
+                    self.session.get(key, "")
+                    for key in self.session
+                    if key in ["v2ray", "cloudflared", "tun2socks"]
+                ]
+            ),
+        )
+        for unit in active_units:
+            systemd.stop(unit)
 
-        with ClientSession(self.remote) as client:
-            client.commit("delete_iface")
-            client.commit("delete_node_route")
-            client.commit("delete_dns_rule")
+        if self.session:
+            with ClientSession(self.vpnmd_address) as client:
+                client.commit("delete_iface", self.session["ifindex"])
+                client.commit(
+                    "delete_node_route",
+                    self.session["node_address"],
+                    self.session["default_gateway_address"],
+                )
+                client.commit("delete_dns_rule", self.settings["dns_port"])
 
     def start(self, mode: str = "", ping: bool = False):
         self.auth.set_account()
@@ -154,7 +185,7 @@ class Connection:
         if mode:
             cmd.append(mode)
 
-        subprocess.run(cmd, check=True, capture_output=False)
+        subprocess.run(cmd, check=True, capture_output=True)
 
         if not mode:
             subprocess.run(["clear"], check=True)
@@ -168,26 +199,44 @@ class Connection:
         if address == "127.0.0.1":
             raise ValueError(address)
 
-        with ClientSession(self.remote) as client:
-            ifindex, ifaddr = client.commit("get_ifindex_and_ifaddr")
-            ifindex, ifaddr = _get_ifindex_and_ifaddr(ifindex, ifaddr)
+        if self.settings["socks_port"] != "1080":
+            config["inbounds"][0]["port"] = self.settings["socks_port"]
+
+            with open(self.config, "w") as file:
+                json.dump(config, file)
+
+        with ClientSession(self.vpnmd_address) as client:
+            ifindex, ifaddr = _get_ifindex_and_ifaddr(
+                self.session.get("ifindex"), self.session.get("ifaddr")
+            )
             metric, default_gateway_address = _get_default_gateway_with_metric(ifindex)
-            node_address = client.commit("get_node_address")
-            unit = self.session.data.get("v2ray", "")
+            node_address = self.session.get("node_address")
+            unit = self.session.get("v2ray", "")
 
             if node_address != address:
-                client.commit(
+                response = client.commit(
                     "add_node_route", address, default_gateway_address, metric - 1
                 )
+
+                assert isinstance(response, subprocess.CompletedProcess)
+                response.check_returncode()
+                self.session["node_address"] = address
+                self.session["default_gateway_address"] = default_gateway_address
+                self.session["default_gateway_metric"] = metric
+
                 if systemd.is_active(unit):
                     systemd.stop(unit)
 
             if not systemd.is_active(unit):
                 unit = systemd.run(["v2ray", "-config", self.config])
-                self.session.data = {"v2ray": unit}
+                self.session["v2ray"] = unit
 
-            client.commit("add_iface", ifindex, ifaddr)
-            unit = self.session.data.get("tun2socks", "")
+            response = client.commit("add_iface", ifindex, ifaddr)
+            assert isinstance(response, subprocess.CompletedProcess)
+            response.check_returncode()
+            self.session["ifindex"] = ifindex
+            self.session["ifaddr"] = ifaddr
+            unit = self.session.get("tun2socks", "")
 
             if not systemd.is_active(unit):
                 unit = systemd.run(
@@ -196,15 +245,19 @@ class Connection:
                         "-device",
                         f"tun://tun{ifindex}",
                         "-proxy",
-                        f"socks5://127.0.0.1:{self.socks_port}",
+                        f"socks5://127.0.0.1:{self.settings['socks_port']}",
                     ]
                 )
-                self.session.data = {"tun2socks": unit}
+                self.session["tun2socks"] = unit
 
-            client.commit("set_iface_up")
-            client.commit("add_default_route", metric)
+            response = client.commit("set_iface_up", ifindex)
+            assert isinstance(response, subprocess.CompletedProcess)
+            response.check_returncode()
 
-            unit = self.session.data.get("cloudflared", "")
+            response = client.commit("add_default_route", metric, ifindex)
+            assert isinstance(response, subprocess.CompletedProcess)
+            response.check_returncode()
+            unit = self.session.get("cloudflared", "")
 
             if not systemd.is_active(unit):
                 unit = systemd.run(
@@ -212,18 +265,20 @@ class Connection:
                         "cloudflared-linux-amd64",
                         "proxy-dns",
                         "--port",
-                        str(self.dns_port),
+                        self.settings["dns_port"],
                     ],
                 )
-                self.session.data = {"cloudflared": unit}
+                self.session["cloudflared"] = unit
 
             while not self.address:
                 proc = subprocess.run(
-                    ["dig", "@127.0.0.1", "-p", str(self.dns_port), host],
+                    ["dig", "@127.0.0.1", "-p", self.settings["dns_port"], host],
                     check=False,
                     capture_output=True,
                 )
                 if address in proc.stdout.decode():
                     self.address = address
 
-            client.commit("add_dns_rule", str(self.dns_port))
+            response = client.commit("add_dns_rule", self.settings["dns_port"])
+            assert isinstance(response, subprocess.CompletedProcess)
+            response.check_returncode()

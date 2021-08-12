@@ -32,7 +32,7 @@ def is_active(unit: str) -> bool:
         )
     except subprocess.CalledProcessError:
         return False
-    if "active" in proc.stdout.decode().split():
+    if "active" in proc.stdout.decode():
         return True
     return False
 

@@ -175,15 +175,15 @@ class Installer:
     unit_path = Path("/etc/systemd/system/vpnmd.service")
     unit_content = f"""[Unit]
 Description=VPN Manager daemon
-After=network-online.member
-Wants=network-online.member
+After=network-online.target
+Wants=network-online.target
 
 [Service]
 Restart=on-failure
 ExecStart={Downloader.bin_path.as_posix()}/{GitHubAPI.filenames[-2]}
 
 [Install]
-WantedBy=multi-user.member"""
+WantedBy=multi-user.target"""
     install_commands = [
         "systemctl daemon-reload",
         f"systemctl enable --now {GitHubAPI.filenames[-2]}",

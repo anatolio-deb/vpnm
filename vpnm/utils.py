@@ -1,17 +1,27 @@
-import os
+import json
 import pathlib
-from abc import ABCMeta, abstractmethod
+from collections import UserDict
 
 import requests
 
 
-def get_location(address: str) -> dict:
+def get_location(address: str):
+    location = ""
+
     try:
         response = requests.get(f"http://ip-api.com/json/{address}")
     except requests.exceptions.RequestException:
-        return {}
+        data = {}
     else:
-        return response.json()
+        data = response.json()
+    finally:
+        city = data.get("city")
+        country = data.get("country")
+
+        if city and country:
+            location = f", {city}, {country}"
+
+    return location
 
 
 def get_actual_address() -> str:
@@ -28,28 +38,32 @@ def get_actual_address() -> str:
         return response.text
 
 
-class AbstractPath(metaclass=ABCMeta):
-    root = pathlib.Path().home() / ".config/vpnm/"
-    _data: dict = {}
+class JSONFileStorage(UserDict):
+    root = pathlib.Path().home() / ".config"
+    container = root / "vpnm"
 
-    @staticmethod
-    @abstractmethod
-    def get_file():
-        pass
+    def __setitem__(self, key, value):
+        super().__setitem__(key, value)
 
-    def __init__(self) -> None:
+        with open(self.filepath, "w") as file:
+            json.dump(self.data, file, sort_keys=True, indent=4)
+
+    def __init__(self, filename: str) -> None:
+        super().__init__()
+
+        if ".json" not in filename:
+            filename = f"{filename}.json"
+
+        self.filepath = self.container / filename
+
         if not self.root.exists():
-            os.makedirs(self.root)
+            self.root.mkdir()
 
-    @property
-    @abstractmethod
-    def data(self):
-        pass
+        if not self.container.exists():
+            self.container.mkdir()
 
-    @classmethod
-    def __subclasshook__(cls, C):
-        if cls is AbstractPath:
-            attrs = set(dir(C))
-            if set(cls.__abstractmethods__) <= attrs:
-                return True
-        return NotImplemented
+        if not self.filepath.exists():
+            self.filepath.touch()
+        elif self.filepath.read_text():
+            with open(self.filepath, "r") as file:
+                self.data = json.load(file)

@@ -7,7 +7,7 @@ import requests
 from requests.exceptions import HTTPError
 
 from vpnm import __version__, vpnmd_api, web_api
-from vpnm.utils import get_actual_address, get_location
+from vpnm.utils import JSONFileStorage, get_location
 
 
 @click.group()
@@ -55,7 +55,8 @@ def status():
 
     try:
         if connection.is_active():
-            click.secho(f"Connected to {connection.address}", fg="green")
+            location = get_location(connection.address)
+            click.secho(f"Connected to {connection.address}{location}", fg="green")
         else:
             click.secho("Not connected", fg="red")
     except ConnectionRefusedError:
@@ -149,27 +150,21 @@ def connect(mode, ping):
             )
         except OSError as ex:
             click.secho(ex, fg="red")
-        # except KeyboardInterrupt:
-        #     click.echo("Ending session properly, please wait...")
-        #     connection.stop()
+        except KeyboardInterrupt:
+            while True:
+                try:
+                    connection.stop()
+                except KeyboardInterrupt:
+                    click.echo("Ending the session properly, please wait...")
+                    click.clear()
+                else:
+                    break
         else:
-            address = get_actual_address()
-            location = get_location(address)
-            city = location.get("city")
-            country = location.get("country")
-
-            if city and country:
-                location = ", " + city + ", " + country
+            if connection.is_active():
+                location = get_location(connection.address)
+                click.secho(f"Connected to {connection.address}{location}", fg="green")
             else:
-                location = ""
-
-            click.secho(f"Connected to {address}{location}", fg="green")
-
-            if address != connection.address:
-                click.secho(
-                    f"However, {connection.address} is expected",
-                    fg="bright_black",
-                )
+                click.secho("Not connected", fg="red")
     else:
         click.echo("Are you logged in?")
         click.secho("Check it with 'vpnm login'", fg="bright_black")
@@ -192,8 +187,10 @@ def disconnect():
 @cli.command(help="Logout from your VPN Manager account")
 def logout():
     """Remove the web_api.PathService.secret"""
-    if not web_api.get_prompt_desicion() and web_api.Secret.get_file().exists():
-        web_api.Secret.get_file().unlink()
+    secret = JSONFileStorage("secret")
+
+    if not web_api.get_prompt_desicion() and secret:
+        secret.filepath.unlink()
     click.secho("Logged out", fg="red")
 
 

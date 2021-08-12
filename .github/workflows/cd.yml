@@ -1,7 +1,9 @@
-name: "CI/CD"
+name: "CD"
 
 on:
   push:
+    tags:
+      - "v*.*.*"
     branches:
       - main
 
@@ -32,6 +34,9 @@ jobs:
       with:
         fetch-depth: 0
     - name: release
-      uses: relekang/python-semantic-release@master
-      with:
-        github_token: ${{ secrets.PYPI_TOKEN }}
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          files: |
+            dist/vpnmd
