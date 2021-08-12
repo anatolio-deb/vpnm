@@ -282,7 +282,7 @@ if __name__ == "__main__":
 
         downloader.process_urls()
 
-        print("Installing" + "\x1b[36m" + "VPN Manager" + "\x1b[39m" + "...")
+        print("Installing " + "\x1b[36m" + "VPN Manager" + "\x1b[39m" + "...")
         print()
 
         installer.install()
