@@ -134,9 +134,8 @@ class Connection:
                     "iptables_rule_exists", self.settings["dns_port"]
                 )
 
-            node_address = self.session["node_address"]
             self.address = get_actual_address()
-            status = node_address == self.address
+            status = self.session["node_address"] == self.address
 
         return status
 

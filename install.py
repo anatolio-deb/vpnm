@@ -102,7 +102,10 @@ class Downloader:
 
         if filepath.exists():
 
-            if filepath is self.bin_path / GitHubAPI.filenames[3]:
+            if filepath in [
+                self.bin_path / GitHubAPI.filenames[3],
+                self.bin_path / GitHubAPI.filenames[2],
+            ]:
                 cmd = "-v"
 
             stdout = self.run([filepath.as_posix(), cmd])
@@ -287,7 +290,7 @@ if __name__ == "__main__":
 
         installer.install()
 
-        print("\x1b[36m" + "VPN Manager" + "\x1b[39m" + "is installed now. Great!")
+        print("\x1b[36m" + "VPN Manager " + "\x1b[39m" + "is installed now. Great!")
         print()
         print("You can test that everything is set up by executing:")
         print("`vpnm --help`")
