@@ -16,7 +16,8 @@ class Auth:
                 f"{self.api_url}/token", data={"email": email, "passwd": password}
             )
             if response.json().get("msg") == "ok":
-                self.secret["token"] = response.json().get("data")
+                self.secret["token"] = response.json()["data"]["token"]
+                self.secret["user_id"] = response.json()["data"]["user_id"]
             else:
                 raise requests.exceptions.HTTPError(response.json().get("msg"))
 

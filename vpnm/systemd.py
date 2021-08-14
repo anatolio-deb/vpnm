@@ -1,21 +1,16 @@
 import subprocess
-from typing import Iterable
-
-CMD = [
-    "systemd-run",
-    "--user",
-    "--collect",
-    "-p",
-    "Restart=on-failure",
-]
 
 
-def run(command: Iterable) -> str:
-    cmd = CMD.copy()
-    cmd.extend(command)
-
+def run(command: list[str]) -> str:
     proc = subprocess.run(
-        cmd,
+        [
+            "systemd-run",
+            "--user",
+            "--collect",
+            "-p",
+            "Restart=on-failure",
+        ]
+        + command,
         check=True,
         capture_output=True,
     )
