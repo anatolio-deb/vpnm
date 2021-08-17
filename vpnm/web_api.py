@@ -175,7 +175,8 @@ class Subscrition:
             max_len = max([len(node["ps"]) for node in self.nodes])
             menu = TerminalMenu(
                 [
-                    f"{node['ps']}{' '*((max_len-len(node['ps']))+1)}{int(node['latency'])} ms"
+                    f"{node['ps']}{' '*((max_len-len(node['ps']))+1)}\
+                        {int(node['latency'])} ms"
                     for node in self.nodes
                 ],
                 clear_screen=True,
