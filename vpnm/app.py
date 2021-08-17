@@ -108,23 +108,17 @@ def account():
     "--best",
     "mode",
     help="Connect to the best server according to the latency",
-    flag_value="-best",
+    flag_value="best",
     default="",
 )
 @click.option(
     "--random",
     "mode",
     help="Connect to the random server",
-    flag_value="-random",
+    flag_value="random",
     default="",
 )
-@click.option(
-    "--ping",
-    help="Wether to ping servers before trying to connect",
-    is_flag=True,
-    default=False,
-)
-def connect(mode, ping):
+def connect(mode):
     """Sends an IPC request to the VPNM daemon service"""
 
     if not web_api.get_prompt_desicion():
@@ -132,7 +126,7 @@ def connect(mode, ping):
         connection = vpnmd_api.Connection()
 
         try:
-            connection.start(mode, ping)
+            connection.start(mode)
         except ConnectionRefusedError:
             click.echo("Is vpnm daemon running?")
             click.secho("Check it with 'systemctl status vpnmd'", fg="bright_black")
@@ -143,19 +137,16 @@ def connect(mode, ping):
                 click.secho("Can't connect to API", fg="red")
         except CalledProcessError as ex:
             click.secho(ex.stderr.decode(), fg="red")
-        except ValueError:
-            click.secho(
-                "Consider changing your DNS or trying another node",
-                fg="yellow",
-            )
         except OSError as ex:
             click.secho(ex, fg="red")
         except KeyboardInterrupt:
+
             while True:
+                click.echo("Ending the session properly, please wait...")
+
                 try:
                     connection.stop()
                 except KeyboardInterrupt:
-                    click.echo("Ending the session properly, please wait...")
                     click.clear()
                 else:
                     break

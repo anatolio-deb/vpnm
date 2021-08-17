@@ -1,9 +1,8 @@
 import argparse
 import json
-import subprocess
 import zipfile
 from pathlib import Path
-from subprocess import PIPE, STDOUT, CalledProcessError, Popen, SubprocessError
+from subprocess import PIPE, STDOUT, Popen, SubprocessError
 from threading import Thread
 from urllib.request import Request, urlopen
 
@@ -13,7 +12,6 @@ class GitHubAPI:
         "tun2socks-linux-amd64.zip",
         "v2ray-linux-64.zip",
         "cloudflared-linux-amd64",
-        "v2gen_amd64_linux",
         "vpnmd",
         "vpnm",
     ]
@@ -28,7 +26,6 @@ class GitHubAPI:
         metadata = [
             ("xjasonlyu", "tun2socks"),
             ("cloudflare", "cloudflared"),
-            ("iochen", "v2gen"),
             ("v2fly", "v2ray-core"),
             ("anatolio-deb", "vpnmd"),
             ("anatolio-deb", "vpnm"),
@@ -101,10 +98,7 @@ class Downloader:
     def get_local_version(self, filepath: Path, cmd: str = "--version") -> str:
         if filepath.exists():
 
-            if filepath in [
-                self.bin_path / GitHubAPI.filenames[3],
-                self.bin_path / GitHubAPI.filenames[2],
-            ]:
+            if filepath is self.bin_path / GitHubAPI.filenames[2]:
                 cmd = "-v"
 
             try:
@@ -136,9 +130,13 @@ class Downloader:
                     except OSError:
                         if filename not in GitHubAPI.filenames[:2]:
                             stdout = self.run(["pkill", filename])
+                        elif filename is GitHubAPI.filenames[0]:
+                            stdout = self.run(["pkill", self.members[0]])
+                        else:
+                            stdout = self.run(["pkill", self.members[1]])
 
-                            if stdout:
-                                print(stdout)
+                        if stdout:
+                            print(stdout)
                     else:
                         break
 
