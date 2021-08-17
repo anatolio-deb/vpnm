@@ -362,6 +362,14 @@ socks = ["PySocks (>=1.5.6,!=1.5.7)", "win-inet-pton"]
 use_chardet_on_py3 = ["chardet (>=3.0.2,<5)"]
 
 [[package]]
+name = "simple-term-menu"
+version = "1.3.0"
+description = "A Python package which creates simple interactive menus on the command line."
+category = "main"
+optional = false
+python-versions = "~=3.5"
+
+[[package]]
 name = "toml"
 version = "0.10.2"
 description = "Python Library for Tom's Obvious, Minimal Language"
@@ -425,7 +433,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9"
-content-hash = "2a2fcda2332ef5402b97c076fa75673c2e184bc5d40d087fc8f95c781d14a52e"
+content-hash = "e89b0ae8bd1b8b16c8d0aa768045d6a2648f2c0b1a7837f7369601fb6f489255"
 
 [metadata.files]
 altgraph = [
@@ -634,6 +642,10 @@ regex = [
 requests = [
     {file = "requests-2.26.0-py2.py3-none-any.whl", hash = "sha256:6c1246513ecd5ecd4528a0906f910e8f0f9c6b8ec72030dc9fd154dc1a6efd24"},
     {file = "requests-2.26.0.tar.gz", hash = "sha256:b8aa58f8cf793ffd8782d3d8cb19e66ef36f7aba4353eec859e74678b01b07a7"},
+]
+simple-term-menu = [
+    {file = "simple-term-menu-1.3.0.tar.gz", hash = "sha256:6acb4dd4eb00da0ba1d00cb263708fed4492803c3de8554c8336da013032e711"},
+    {file = "simple_term_menu-1.3.0-py3-none-any.whl", hash = "sha256:c296d319becd9c04256d3ab21d6e1ddc7c8a208b61a56e3794575db9a6a60f4f"},
 ]
 toml = [
     {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},

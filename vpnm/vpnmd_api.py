@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ipaddress
-import json
 import re
 import socket
 import subprocess
@@ -73,12 +72,12 @@ def _get_default_gateway_with_metric(ifindex: str) -> Tuple:
 class Connection:
     session = JSONFileStorage("session")
     settings = JSONFileStorage("settings")
-    settings["socks_port"] = settings.get("socks_port", "1080")
-    settings["dns_port"] = settings.get("dns_port", "1053")
+    settings["socks_port"] = settings.get("socks_port", 1080)
+    settings["dns_port"] = settings.get("dns_port", 1053)
     settings["vpnmd_port"] = settings.get("vpnmd_port", 6554)
-    vpnmd_address = ("localhost", settings["vpnmd_port"])
+    vpnmd_address: Tuple[str, int] = ("localhost", settings["vpnmd_port"])
     auth = web_api.Auth()
-    config = "/tmp/config.json"
+    subscrition = web_api.Subscrition()
     address: str = ""
 
     def is_active(self) -> bool:
@@ -131,7 +130,7 @@ class Connection:
 
             with ClientSession(self.vpnmd_address) as client:
                 status = client.commit(
-                    "iptables_rule_exists", self.settings["dns_port"]
+                    "iptables_rule_exists", str(self.settings["dns_port"])
                 )
 
             self.address = get_actual_address()
@@ -162,47 +161,18 @@ class Connection:
                     self.session["node_address"],
                     self.session["default_gateway_address"],
                 )
-                client.commit("delete_dns_rule", self.settings["dns_port"])
+                client.commit("delete_dns_rule", str(self.settings["dns_port"]))
 
-    def start(self, mode: str = "", ping: bool = False):
+    def start(self, mode: str):
         self.auth.set_account()
-        link = self.auth.account["v2ray"] + "?mu=2"
-        cmd = [
-            "v2gen_amd64_linux",
-            "-loglevel",
-            "error",
-            "-u",
-            link,
-            "-o",
-            self.config,
-        ]
+        url = self.auth.account["v2ray"] + "?mu=2"
+        self.subscrition.update(url)
+        self.subscrition.set_node(self.settings["socks_port"], mode)
 
-        if not ping and mode != "-best":
-            cmd.append("-ping=false")
-        else:
-            cmd.extend(["-c", "1"])
-        if mode:
-            cmd.append(mode)
-
-        subprocess.run(cmd, check=True, capture_output=True)
-
-        if not mode:
-            subprocess.run(["clear"], check=True)
-
-        with open(self.config, "r") as file:
-            config = json.load(file)
-
-        host = config["outbounds"][0]["settings"]["vnext"][0]["address"]
-        address = socket.gethostbyname(host)
-
-        if address == "127.0.0.1":
-            raise ValueError(address)
-
-        if self.settings["socks_port"] != "1080":
-            config["inbounds"][0]["port"] = self.settings["socks_port"]
-
-            with open(self.config, "w") as file:
-                json.dump(config, file)
+        try:
+            address = ipaddress.IPv4Address(self.subscrition.node["add"]).exploded
+        except ValueError:
+            address = socket.gethostbyname(self.subscrition.node["host"])
 
         with ClientSession(self.vpnmd_address) as client:
             ifindex, ifaddr = _get_ifindex_and_ifaddr(
@@ -214,7 +184,10 @@ class Connection:
 
             if node_address != address:
                 response = client.commit(
-                    "add_node_route", address, default_gateway_address, metric - 1
+                    "add_node_route",
+                    address,
+                    default_gateway_address,
+                    metric - 1,
                 )
 
                 assert isinstance(response, subprocess.CompletedProcess)
@@ -227,7 +200,9 @@ class Connection:
                     systemd.stop(unit)
 
             if not systemd.is_active(unit):
-                unit = systemd.run(["v2ray", "-config", self.config])
+                unit = systemd.run(
+                    ["v2ray", "-config", self.subscrition.config.filepath.as_posix()]
+                )
                 self.session["v2ray"] = unit
 
             response = client.commit("add_iface", ifindex, ifaddr)
@@ -264,20 +239,26 @@ class Connection:
                         "cloudflared-linux-amd64",
                         "proxy-dns",
                         "--port",
-                        self.settings["dns_port"],
+                        str(self.settings["dns_port"]),
                     ],
                 )
                 self.session["cloudflared"] = unit
 
             while not self.address:
                 proc = subprocess.run(
-                    ["dig", "@127.0.0.1", "-p", self.settings["dns_port"], host],
+                    [
+                        "dig",
+                        "@127.0.0.1",
+                        "-p",
+                        str(self.settings["dns_port"]),
+                        self.subscrition.node["host"],
+                    ],
                     check=False,
                     capture_output=True,
                 )
                 if address in proc.stdout.decode():
                     self.address = address
 
-            response = client.commit("add_dns_rule", self.settings["dns_port"])
+            response = client.commit("add_dns_rule", str(self.settings["dns_port"]))
             assert isinstance(response, subprocess.CompletedProcess)
             response.check_returncode()
