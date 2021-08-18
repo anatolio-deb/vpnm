@@ -79,6 +79,7 @@ class Connection:
     auth = web_api.Auth()
     subscrition = web_api.Subscrition()
     address: str = ""
+    status: list = []
 
     def is_active(self) -> bool:
         status = (
@@ -99,6 +100,7 @@ class Connection:
             )
             > 0
         )
+        self.status.append(status)
 
         if self.session:
             try:
@@ -112,6 +114,8 @@ class Connection:
             else:
                 status = self.session["ifaddr"] in proc.stdout.decode()
 
+            self.status.append(status)
+
             try:
                 proc = subprocess.run(
                     ["ip", "link", "show", f"tun{self.session['ifindex']}"],
@@ -123,20 +127,29 @@ class Connection:
             else:
                 status = "state UP" in proc.stdout.decode()
 
+            self.status.append(status)
+
             proc = subprocess.run(["ip", "route"], check=True, capture_output=True)
-            status = self.session["node_address"] in proc.stdout.decode()
-            proc = subprocess.run(["ip", "route"], check=True, capture_output=True)
-            status = f"default dev tun{self.session['ifindex']}" in proc.stdout.decode()
+            status = (
+                self.session["node_address"]
+                and f"default dev tun{self.session['ifindex']}" in proc.stdout.decode()
+            )
+
+            self.status.append(status)
 
             with ClientSession(self.vpnmd_address) as client:
                 status = client.commit(
                     "iptables_rule_exists", str(self.settings["dns_port"])
                 )
 
+            self.status.append(status)
+
             self.address = get_actual_address()
             status = self.session["node_address"] == self.address
 
-        return status
+            self.status.append(status)
+
+        return any(self.status)
 
     def stop(self):
         active_units = filter(
