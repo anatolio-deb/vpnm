@@ -25,7 +25,7 @@ jobs:
       - name: Lint with pylint
         run: |
           pip install pylint
-          pylint --max-line-length=88 --disable=missing-function-docstring, unnecessary-pass, too-many-branches --notes= vpnm/
+          pylint --max-line-length=88 --disable=missing-function-docstring,unnecessary-pass,too-many-branches --notes= vpnm/
       - name: "Build"
         run: |
           pip install pyinstaller
