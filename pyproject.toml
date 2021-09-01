@@ -5,10 +5,10 @@ description = ""
 authors = ["Anatolio Nikiforidis <nikiforova693@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.8"
 click = "^8.0.0"
 requests = "^2.25.1"
-anyd = "^0.3.5"
+anyd = "^0.4.1"
 simple-term-menu = "^1.3.0"
 
 
@@ -20,6 +20,7 @@ pylint = "^2.8.2"
 pyinstaller = "^4.3"
 mypy = "^0.910"
 types-requests = "^2.25.0"
+vpnmupd = {path = "../vpnmupd"}
 
 
 [build-system]
@@ -29,12 +30,5 @@ build-backend = "poetry.core.masonry.api"
 [tool.isort]
 profile = "black"
 
-[tool.semantic_release]
-branch = "main"
-version_variable = [
-    'vpnm/__init__.py:__version__',
-]
-version_toml = [
-    'pyproject.toml:tool.poetry.version',
-]
-build_command = "pyinstaller -F -n vpnm --clean vpnm/app.py"
+[tool.poetry.scripts]
+vpnm = "vpnm.app:cli"

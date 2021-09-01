@@ -1,3 +1,6 @@
+"""The client logic of anyd framework to talk with vpnm daemon.
+Also contains some network-related actions and file storage
+management."""
 from __future__ import annotations
 
 import ipaddress
@@ -70,6 +73,8 @@ def _get_default_gateway_with_metric(ifindex: str) -> Tuple:
 
 
 class Connection:
+    """Uses anyd's client logic to query vpnm daemons functions over sockets."""
+
     session = JSONFileStorage("session")
     settings = JSONFileStorage("settings")
     settings["socks_port"] = settings.get("socks_port", 1080)
@@ -187,23 +192,22 @@ class Connection:
         except ValueError:
             address = socket.gethostbyname(self.subscrition.node["host"])
 
-        with ClientSession(self.vpnmd_address) as client:
-            ifindex, ifaddr = _get_ifindex_and_ifaddr(
-                self.session.get("ifindex"), self.session.get("ifaddr")
-            )
-            metric, default_gateway_address = _get_default_gateway_with_metric(ifindex)
-            node_address = self.session.get("node_address")
-            unit = self.session.get("v2ray", "")
+        ifindex, ifaddr = _get_ifindex_and_ifaddr(
+            self.session.get("ifindex"), self.session.get("ifaddr")
+        )
+        metric, default_gateway_address = _get_default_gateway_with_metric(ifindex)
+        node_address = self.session.get("node_address")
+        unit = self.session.get("v2ray", "")
 
+        with ClientSession(self.vpnmd_address) as client:
             if node_address != address:
-                response = client.commit(
+                response: subprocess.CompletedProcess = client.commit(
                     "add_node_route",
                     address,
                     default_gateway_address,
                     metric - 1,
                 )
 
-                assert isinstance(response, subprocess.CompletedProcess)
                 response.check_returncode()
                 self.session["node_address"] = address
                 self.session["default_gateway_address"] = default_gateway_address
@@ -219,7 +223,6 @@ class Connection:
                 self.session["v2ray"] = unit
 
             response = client.commit("add_iface", ifindex, ifaddr)
-            assert isinstance(response, subprocess.CompletedProcess)
             response.check_returncode()
             self.session["ifindex"] = ifindex
             self.session["ifaddr"] = ifaddr
@@ -238,11 +241,9 @@ class Connection:
                 self.session["tun2socks"] = unit
 
             response = client.commit("set_iface_up", ifindex)
-            assert isinstance(response, subprocess.CompletedProcess)
             response.check_returncode()
 
             response = client.commit("add_default_route", metric, ifindex)
-            assert isinstance(response, subprocess.CompletedProcess)
             response.check_returncode()
             unit = self.session.get("cloudflared", "")
 
@@ -273,5 +274,4 @@ class Connection:
                     self.address = address
 
             response = client.commit("add_dns_rule", str(self.settings["dns_port"]))
-            assert isinstance(response, subprocess.CompletedProcess)
             response.check_returncode()

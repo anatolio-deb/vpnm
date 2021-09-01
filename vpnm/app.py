@@ -1,3 +1,4 @@
+"""A click framework console application"""
 import datetime
 import re
 from subprocess import CalledProcessError
@@ -20,17 +21,13 @@ def cli():
 
 @cli.command(help="Login into VPN Manager account")
 @click.option(
-    "--email",
-    prompt=web_api.get_prompt_desicion(),
-    help="Registered email address",
-    # default="nikiforova693@gmail.com",
+    "--email", prompt=web_api.get_prompt_desicion(), help="Registered email address"
 )
 @click.option(
     "--password",
     prompt=web_api.get_prompt_desicion(),
     hide_input=True,
     help="Password provided at registration",
-    # default="xaswug-syVryc-huvfy9",
 )
 def login(email: str, password: str):
     if web_api.get_prompt_desicion():
@@ -50,9 +47,6 @@ def login(email: str, password: str):
 
 @cli.command(help="Get the current connection status")
 def status():
-
-    connection = vpnmd_api.Connection()
-
     try:
         if connection.is_active():
             location = get_location(connection.address)
@@ -122,9 +116,6 @@ def connect(mode):
     """Sends an IPC request to the VPNM daemon service"""
 
     if not web_api.get_prompt_desicion():
-
-        connection = vpnmd_api.Connection()
-
         try:
             connection.start(mode)
         except ConnectionRefusedError:
@@ -162,11 +153,15 @@ def connect(mode):
 
 
 @cli.command(help="Disconnect from the VPN service")
-def disconnect():
-    connection = vpnmd_api.Connection()
-
+@click.option(
+    "--force",
+    help="Disconnect without checking connecton status",
+    is_flag=True,
+    default=False,
+)
+def disconnect(force: bool):
     try:
-        if connection.is_active():
+        if connection.is_active() or force:
             connection.stop()
     except ConnectionRefusedError:
         click.echo("Is vpnm daemon running?")
@@ -186,4 +181,5 @@ def logout():
 
 
 if __name__ == "__main__":
+    connection = vpnmd_api.Connection()
     cli()

@@ -1,3 +1,10 @@
+"""Web-related functionality such as token-based authentication and
+nodes subscrition parsing.
+
+Raises:
+    requests.exceptions.HTTPError: Unnable to get authentication
+    data in Auth class.
+"""
 from __future__ import annotations
 
 import base64
@@ -14,6 +21,12 @@ from vpnm.utils import JSONFileStorage
 
 
 class Auth:
+    """Token-based authentication logic.
+
+    Raises:
+        requests.exceptions.HTTPError: Unnable to get authentication data.
+    """
+
     api_url = "https://ssle2.ru/api/"
     secret = JSONFileStorage("secret")
     account: dict = {}
@@ -37,7 +50,7 @@ class Auth:
             response = requests.get(
                 f"{self.api_url}user4/{user_id}?access_token={token}"
             )
-            if response.json()["msg"] == "ok":
+            if response.json().get("msg") == "ok":
                 self.account = response.json().get("data")
             else:
                 raise requests.exceptions.HTTPError(response.json().get("msg"))
@@ -58,6 +71,25 @@ def get_prompt_desicion() -> bool:
 
 
 class Subscrition:
+    """A logic to parse the nodes subscrition of VPN Manager backend.
+    Thanks to folks from https://github.com/airborne007/v2sub.
+
+    It has a template configuration which is dictionary with some pre-defined and
+    non-defined values. This configuration is a v2ray node configuration that is
+    stored on the filesystem as 'config.json' file and is passed to the v2ray core
+    binary in the vpnmd_api.Connection. See Config Reference at:
+    https:/v2fly.org/en_US/config/overview.html#overview
+
+    Non-defined values are being defined from the parsed configuration data
+    obtained from VPN Manager backend. There're many nodes coming from the subscrition
+    link, but the configuration template is filled only for the node that
+    the user choose in the vpnmd_api.Connection.
+
+    The user choose a node from the list of all nodes coming from the subscrition link
+    in the terminal menu by facilities of simple-term-menu package. See more at:
+    https://pypi.org/project/simple-term-menu/.
+    """
+
     nodes: list = []
     node: dict = {}
     threads: list[Thread] = []

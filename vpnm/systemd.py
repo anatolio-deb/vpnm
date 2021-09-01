@@ -1,7 +1,9 @@
+"""Control systemd transient units"""
 import subprocess
+from typing import List
 
 
-def run(command: list[str]) -> str:
+def run(command: List[str]) -> str:
     proc = subprocess.run(
         [
             "systemd-run",

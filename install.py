@@ -209,8 +209,9 @@ WantedBy=multi-user.target"""
         self.verbosity = verbosity
 
     def install(self):
-        with open(self.unit_path, "w") as file:
-            file.write(self.unit_content)
+        if not self.unit_path.exists():
+            with open(self.unit_path, "w") as file:
+                file.write(self.unit_content)
 
         for command in self.install_commands:
             try:

@@ -1,3 +1,5 @@
+"""Utility functions and classess such as checking IP address and location,
+and File storage"""
 import json
 import pathlib
 from collections import UserDict
@@ -39,6 +41,9 @@ def get_actual_address() -> str:
 
 
 class JSONFileStorage(UserDict):
+    """A file storage to store data in json format
+    as well as keepeing the actual state in the memory."""
+
     root = pathlib.Path().home() / ".config"
     container = root / "vpnm"
 
