@@ -20,7 +20,6 @@ pylint = "^2.8.2"
 pyinstaller = "^4.3"
 mypy = "^0.910"
 types-requests = "^2.25.0"
-vpnmupd = {path = "../vpnmupd"}
 
 
 [build-system]
