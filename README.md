@@ -62,6 +62,8 @@ curl -sSL https://raw.githubusercontent.com/anatolio-deb/vpnm/main/install.py | 
 The internet connection goes down after a while of being connected to some node.
 ### Hypothesis
 Cloudflared daemon loses connection to the DoH server after some instabillity of v2ray connection on which it relies.
+### Workaround
+Simply `vpnm disconnect` and `vpnm connect` again.
 ### Solution
 Monitor the DNS availability during an active v2ray connection in a separate thread and reload the cloudflared daemon on DNS response issues.
 
