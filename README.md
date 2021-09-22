@@ -13,7 +13,6 @@ curl -sSL https://raw.githubusercontent.com/anatolio-deb/vpnm/main/install.py | 
 - [cloudflared](https://github.com/cloudflare/cloudflared) — to forward DoH queries through the TUN interface
 - [tun2socks](https://github.com/xjasonlyu/tun2socks) — to forward TCP through the SOCKS proxy
 - [vpnmd](https://github.com/anatolio-deb/vpnmd) — to run privileged kernel instructions
-- [v2gen](https://github.com/iochen/v2gen) — to manage servers
 - [v2ray-core](https://github.com/v2ray/v2ray-core) — to be free
 - netfilter/iptables
 - iproute2
