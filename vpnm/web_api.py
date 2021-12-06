@@ -27,7 +27,7 @@ class Auth:
         requests.exceptions.HTTPError: Unnable to get authentication data.
     """
 
-    api_url = "https://ssle3.ru/api/"
+    api_url = "https://ssle4.ru/api/"
     secret = JSONFileStorage("secret")
     account: dict = {}
 
