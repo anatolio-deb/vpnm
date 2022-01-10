@@ -81,7 +81,6 @@ class Connection:
     settings["dns_port"] = settings.get("dns_port", 1053)
     settings["vpnmd_port"] = settings.get("vpnmd_port", 6554)
     vpnmd_address: Tuple[str, int] = ("localhost", settings["vpnmd_port"])
-    auth = web_api.Auth()
     subscrition = web_api.Subscrition()
     address: str = ""
     status: list = []
@@ -182,15 +181,14 @@ class Connection:
                 client.commit("delete_dns_rule", str(self.settings["dns_port"]))
 
     def start(self, mode: str):
-        self.auth.set_account()
-        url = self.auth.account["v2ray"] + "?mu=2"
-        self.subscrition.update(url)
         self.subscrition.set_node(self.settings["socks_port"], mode)
 
         try:
-            address = ipaddress.IPv4Address(self.subscrition.node["add"]).exploded
+            address = ipaddress.IPv4Address(
+                self.subscrition.node["server"]["address"]
+            ).exploded
         except ValueError:
-            address = socket.gethostbyname(self.subscrition.node["host"])
+            address = socket.gethostbyname(self.subscrition.node["server"]["host"])
 
         ifindex, ifaddr = _get_ifindex_and_ifaddr(
             self.session.get("ifindex"), self.session.get("ifaddr")
@@ -265,7 +263,7 @@ class Connection:
                         "@127.0.0.1",
                         "-p",
                         str(self.settings["dns_port"]),
-                        self.subscrition.node["host"],
+                        self.subscrition.node["server"]["host"],
                     ],
                     check=False,
                     capture_output=True,

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "vpnm"
-version = "1.1.0"
+version = "0.1.0"
 description = ""
 authors = ["Anatolio Nikiforidis <nikiforova693@gmail.com>"]
 
@@ -10,6 +10,7 @@ click = "^8.0.0"
 requests = "^2.25.1"
 anyd = "^0.4.1"
 simple-term-menu = "^1.3.0"
+vpnmauth = {git = "https://github.com/anatolio-deb/vpnmauth.git"}
 
 
 [tool.poetry.dev-dependencies]

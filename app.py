@@ -6,6 +6,7 @@ from subprocess import CalledProcessError
 import click
 import requests
 from requests.exceptions import HTTPError
+from vpnmauth import VpnmApiClient
 
 from vpnm import __version__, vpnmd_api, web_api
 from vpnm.utils import JSONFileStorage, get_location
@@ -31,15 +32,21 @@ def cli():
 )
 def login(email: str, password: str):
     if web_api.get_prompt_desicion():
-        auth = web_api.Auth()
+        api_client = VpnmApiClient(
+            api_url="https://ssle4.ru/api", email=email, password=password
+        )
+        secret = JSONFileStorage("secret")
 
         try:
-            auth.set_secret(email, password)
+            response = api_client.login()
         except requests.exceptions.RequestException as ex:
             if isinstance(ex, HTTPError):
                 click.secho(ex, fg="yellow")
             else:
                 click.secho("Can't connect to API", fg="red")
+        else:
+            secret["token"] = response["token"]
+            secret["user_id"] = response["user_id"]
 
     if not web_api.get_prompt_desicion():
         click.secho("Logged in", fg="green")
@@ -61,17 +68,22 @@ def status():
 @cli.command(help="Get information on your account")
 def account():
     if not web_api.get_prompt_desicion():
-        auth = web_api.Auth()
+        secret = JSONFileStorage("secret")
+        api_client = VpnmApiClient(
+            api_url="https://ssle4.ru/api",
+            user_id=secret["user_id"],
+            token=secret["token"],
+        )
 
         try:
-            auth.set_account()
+            response = api_client.account
         except requests.RequestException:
             click.secho("Can't connect to API", fg="red")
         else:
-            online = auth.account.get("online")
-            limit = auth.account.get("limit")
-            level = auth.account.get("account_level")
-            balance = auth.account.get("balance")
+            online = response["online"]
+            limit = response["limit"]
+            level = response["account_level"]
+            balance = response["balance"]
 
             if level == 4:
                 level = "VIP"
@@ -81,10 +93,10 @@ def account():
                 level = "Standart"
 
             pattern = re.compile(r"[\d.]*\d+")
-            remaining = pattern.findall(auth.account.get("remaining_flow"))[0]
-            total = auth.account.get("total_flow")
+            remaining = pattern.findall(response["remaining_flow"])[0]
+            total = response["total_flow"]
             days_left = str(
-                datetime.datetime.fromtimestamp(auth.account.get("expire_date"))
+                datetime.datetime.fromtimestamp(response["expire_date"])
                 - datetime.datetime.now()
             )
 

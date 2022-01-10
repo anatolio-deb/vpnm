@@ -50,7 +50,7 @@ class JSONFileStorage(UserDict):
     def __setitem__(self, key, value):
         super().__setitem__(key, value)
 
-        with open(self.filepath, "w") as file:
+        with open(self.filepath, "w", encoding="utf-8") as file:
             json.dump(self.data, file, sort_keys=True, indent=4)
 
     def __init__(self, filename: str) -> None:
@@ -70,5 +70,5 @@ class JSONFileStorage(UserDict):
         if not self.filepath.exists():
             self.filepath.touch()
         elif self.filepath.read_text():
-            with open(self.filepath, "r") as file:
+            with open(self.filepath, "r", encoding="utf-8") as file:
                 self.data = json.load(file)
