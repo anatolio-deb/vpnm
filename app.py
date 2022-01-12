@@ -69,7 +69,7 @@ def status():
 def account():
     if web_api.is_authenticated():
         with open(SECRET, "r", encoding="utf-8") as file:
-            secret = json.loads(file)
+            secret = json.load(file)
 
         api_client = VpnmApiClient(
             api_url="https://ssle4.ru/api",
@@ -82,10 +82,10 @@ def account():
         except requests.RequestException:
             click.secho("Can't connect to API", fg="red")
         else:
-            online = response["online"]
-            limit = response["limit"]
-            level = response["account_level"]
-            balance = response["balance"]
+            online = response["data"]["online"]
+            limit = response["data"]["limit"]
+            level = response["data"]["account_level"]
+            balance = response["data"]["balance"]
 
             if level == 4:
                 level = "VIP"
@@ -95,10 +95,10 @@ def account():
                 level = "Standart"
 
             pattern = re.compile(r"[\d.]*\d+")
-            remaining = pattern.findall(response["remaining_flow"])[0]
-            total = response["total_flow"]
+            remaining = pattern.findall(response["data"]["remaining_flow"])[0]
+            total = response["data"]["total_flow"]
             days_left = str(
-                datetime.datetime.fromtimestamp(response["expire_date"])
+                datetime.datetime.fromtimestamp(response["data"]["expire_date"])
                 - datetime.datetime.now()
             )
 
