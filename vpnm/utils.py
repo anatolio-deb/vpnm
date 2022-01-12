@@ -2,9 +2,33 @@
 and File storage"""
 import json
 import pathlib
-from collections import UserDict
 
 import requests
+
+CONFROOT = pathlib.Path().home()
+CONFDIR = CONFROOT / ".config"
+VPNMDIR = CONFDIR / "vpnm"
+SECRET = VPNMDIR / "secret.json"
+SESSION = VPNMDIR / "session.json"
+SETTINGS = VPNMDIR / "settings.json"
+CONFIG = VPNMDIR / "config.json"
+
+
+def init():
+    if not CONFDIR.exists():
+        CONFDIR.mkdir()
+    if not VPNMDIR.exists():
+        VPNMDIR.mkdir()
+    if not SETTINGS.exists():
+        with open(SETTINGS, "w", encoding="utf-8") as file:
+            json.dump(
+                {
+                    "socks_port": 1080,
+                    "dns_port": 1053,
+                    "vpnmd_port": 6554,
+                },
+                file,
+            )
 
 
 def get_location(address: str):
@@ -38,37 +62,3 @@ def get_actual_address() -> str:
         return "unknown"
     else:
         return response.text
-
-
-class JSONFileStorage(UserDict):
-    """A file storage to store data in json format
-    as well as keepeing the actual state in the memory."""
-
-    root = pathlib.Path().home() / ".config"
-    container = root / "vpnm"
-
-    def __setitem__(self, key, value):
-        super().__setitem__(key, value)
-
-        with open(self.filepath, "w", encoding="utf-8") as file:
-            json.dump(self.data, file, sort_keys=True, indent=4)
-
-    def __init__(self, filename: str) -> None:
-        super().__init__()
-
-        if ".json" not in filename:
-            filename = f"{filename}.json"
-
-        self.filepath = self.container / filename
-
-        if not self.root.exists():
-            self.root.mkdir()
-
-        if not self.container.exists():
-            self.container.mkdir()
-
-        if not self.filepath.exists():
-            self.filepath.touch()
-        elif self.filepath.read_text():
-            with open(self.filepath, "r", encoding="utf-8") as file:
-                self.data = json.load(file)

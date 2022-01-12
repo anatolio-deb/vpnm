@@ -4,15 +4,16 @@ management."""
 from __future__ import annotations
 
 import ipaddress
+import json
 import re
 import socket
 import subprocess
-from typing import Tuple
+from typing import Dict, List, Tuple
 
 from anyd import ClientSession
 
 from vpnm import systemd, web_api
-from vpnm.utils import JSONFileStorage, get_actual_address
+from vpnm.utils import CONFIG, SESSION, SETTINGS, get_actual_address
 
 
 def _get_ifindex_and_ifaddr(ifindex: int | None, ifaddr: str | None) -> Tuple:
@@ -75,15 +76,20 @@ def _get_default_gateway_with_metric(ifindex: str) -> Tuple:
 class Connection:
     """Uses anyd's client logic to query vpnm daemons functions over sockets."""
 
-    session = JSONFileStorage("session")
-    settings = JSONFileStorage("settings")
-    settings["socks_port"] = settings.get("socks_port", 1080)
-    settings["dns_port"] = settings.get("dns_port", 1053)
-    settings["vpnmd_port"] = settings.get("vpnmd_port", 6554)
-    vpnmd_address: Tuple[str, int] = ("localhost", settings["vpnmd_port"])
     subscrition = web_api.Subscrition()
-    address: str = ""
-    status: list = []
+    address = ""
+    status: List = []
+    session: Dict = {}
+
+    def __init__(self) -> None:
+        if SESSION.exists() and SESSION.read_text():
+            with open(SESSION, "r", encoding="utf-8") as file:
+                self.session = json.load(file)
+
+        with open(SETTINGS, "r", encoding="utf-8") as file:
+            self.settings = json.load(file)
+
+        self.vpnmd_address = ("localhost", self.settings["vpnmd_port"])
 
     def is_active(self) -> bool:
         status = (
@@ -135,7 +141,7 @@ class Connection:
 
             proc = subprocess.run(["ip", "route"], check=True, capture_output=True)
             status = (
-                self.session["node_address"]
+                self.session["node_id"]
                 and f"default dev tun{self.session['ifindex']}" in proc.stdout.decode()
             )
 
@@ -149,7 +155,7 @@ class Connection:
             self.status.append(status)
 
             self.address = get_actual_address()
-            status = self.session["node_address"] == self.address
+            status = self.session["node_id"] == self.address
 
             self.status.append(status)
 
@@ -175,7 +181,7 @@ class Connection:
                 client.commit("delete_iface", self.session["ifindex"])
                 client.commit(
                     "delete_node_route",
-                    self.session["node_address"],
+                    self.session["node_id"],
                     self.session["default_gateway_address"],
                 )
                 client.commit("delete_dns_rule", str(self.settings["dns_port"]))
@@ -184,21 +190,19 @@ class Connection:
         self.subscrition.set_node(self.settings["socks_port"], mode)
 
         try:
-            address = ipaddress.IPv4Address(
-                self.subscrition.node["server"]["address"]
-            ).exploded
+            address = ipaddress.IPv4Address(self.subscrition.host).exploded
         except ValueError:
-            address = socket.gethostbyname(self.subscrition.node["server"]["host"])
+            address = socket.gethostbyname(self.subscrition.host)
 
         ifindex, ifaddr = _get_ifindex_and_ifaddr(
             self.session.get("ifindex"), self.session.get("ifaddr")
         )
         metric, default_gateway_address = _get_default_gateway_with_metric(ifindex)
-        node_address = self.session.get("node_address")
+        node_id = self.session.get("node_id")
         unit = self.session.get("v2ray", "")
 
         with ClientSession(self.vpnmd_address) as client:
-            if node_address != address:
+            if node_id != self.subscrition.node["id"]:
                 response: subprocess.CompletedProcess = client.commit(
                     "add_node_route",
                     address,
@@ -207,7 +211,7 @@ class Connection:
                 )
 
                 response.check_returncode()
-                self.session["node_address"] = address
+                self.session["node_id"] = self.subscrition.node["id"]
                 self.session["default_gateway_address"] = default_gateway_address
                 self.session["default_gateway_metric"] = metric
 
@@ -215,9 +219,7 @@ class Connection:
                     systemd.stop(unit)
 
             if not systemd.is_active(unit):
-                unit = systemd.run(
-                    ["v2ray", "-config", self.subscrition.config.filepath.as_posix()]
-                )
+                unit = systemd.run(["v2ray", "-config", CONFIG.as_posix()])
                 self.session["v2ray"] = unit
 
             response = client.commit("add_iface", ifindex, ifaddr)
@@ -263,7 +265,7 @@ class Connection:
                         "@127.0.0.1",
                         "-p",
                         str(self.settings["dns_port"]),
-                        self.subscrition.node["server"]["host"],
+                        self.subscrition.host,
                     ],
                     check=False,
                     capture_output=True,
@@ -273,3 +275,6 @@ class Connection:
 
             response = client.commit("add_dns_rule", str(self.settings["dns_port"]))
             response.check_returncode()
+
+        with open(SESSION, "w", encoding="utf-8") as file:
+            json.dump(self.session, file, indent=4)

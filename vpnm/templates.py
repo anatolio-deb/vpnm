@@ -1,21 +1,22 @@
 from typing import Dict
 
-TEMPLATE_NON_443: Dict = {
+PORT_NON_443: Dict = {
     "outbounds": [
         {
-            "mux": {},
+            "mux": {"concurrency": 8, "enabled": False},
             "protocol": "vmess",
-            "sendThrough": "0.0.0.0",
             "settings": {
                 "vnext": [
                     {
-                        "address": "",
-                        "port": 0,
+                        "address": "185.46.8.224",
+                        "port": 80,
                         "users": [
                             {
                                 "alterId": 0,
-                                "id": "",
-                                "level": 0,
+                                "encryption": "",
+                                "flow": "",
+                                "id": "d1453437-0014-35fa-a849-cd5554683d72",
+                                "level": 8,
                                 "security": "auto",
                             }
                         ],
@@ -23,69 +24,32 @@ TEMPLATE_NON_443: Dict = {
                 ]
             },
             "streamSettings": {
-                "dsSettings": {"path": "/"},
-                "httpSettings": {"host": [], "path": "/"},
-                "kcpSettings": {
-                    "congestion": False,
-                    "downlinkCapacity": 20,
-                    "header": {"type": "none"},
-                    "mtu": 1350,
-                    "readBufferSize": 1,
-                    "tti": 20,
-                    "uplinkCapacity": 5,
-                    "writeBufferSize": 1,
-                },
-                "network": "",
-                "quicSettings": {"header": {"type": "none"}, "key": "", "security": ""},
+                "network": "tcp",
                 "security": "",
-                "sockopt": {"mark": 0, "tcpFastOpen": False, "tproxy": "off"},
-                "tcpSettings": {
-                    "header": {
-                        "request": {
-                            "headers": {},
-                            "method": "GET",
-                            "path": [],
-                            "version": "1.1",
-                        },
-                        "response": {
-                            "headers": {},
-                            "reason": "OK",
-                            "status": "200",
-                            "version": "1.1",
-                        },
-                        "type": "none",
-                    }
-                },
-                "tlsSettings": {
-                    "allowInsecure": False,
-                    "alpn": [],
-                    "certificates": [],
-                    "disableSystemRoot": False,
-                    "serverName": "",
-                },
-                "wsSettings": {"headers": {}, "path": "/"},
+                "tcpSettings": {"header": {"type": "none"}},
             },
-            "tag": "outBound_PROXY",
-        }
-    ]
+            "tag": "proxy",
+        },
+    ],
 }
 
-TEMPLATE_443: Dict = {
+PORT_443: Dict = {
     "outbounds": [
         {
-            "mux": {},
+            "mux": {"concurrency": 8, "enabled": False},
             "protocol": "vmess",
-            "sendThrough": "0.0.0.0",
             "settings": {
                 "vnext": [
                     {
-                        "address": "",
-                        "port": 0,
+                        "address": "nc.b2rc.ru",
+                        "port": 443,
                         "users": [
                             {
                                 "alterId": 0,
-                                "id": "",
-                                "level": 0,
+                                "encryption": "",
+                                "flow": "",
+                                "id": "d1453437-0014-35fa-a849-cd5554683d72",
+                                "level": 8,
                                 "security": "auto",
                             }
                         ],
@@ -93,52 +57,12 @@ TEMPLATE_443: Dict = {
                 ]
             },
             "streamSettings": {
-                "dsSettings": {"path": "/"},
-                "httpSettings": {"host": [], "path": "/"},
-                "kcpSettings": {
-                    "congestion": False,
-                    "downlinkCapacity": 20,
-                    "header": {"type": "none"},
-                    "mtu": 1350,
-                    "readBufferSize": 1,
-                    "tti": 20,
-                    "uplinkCapacity": 5,
-                    "writeBufferSize": 1,
-                },
-                "network": "",
-                "quicSettings": {"header": {"type": "none"}, "key": "", "security": ""},
-                "security": "",
-                "sockopt": {"mark": 0, "tcpFastOpen": False, "tproxy": "off"},
-                "tcpSettings": {
-                    "header": {
-                        "request": {
-                            "headers": {},
-                            "method": "GET",
-                            "path": [],
-                            "version": "1.1",
-                        },
-                        "response": {
-                            "headers": {},
-                            "reason": "OK",
-                            "status": "200",
-                            "version": "1.1",
-                        },
-                        "type": "none",
-                    }
-                },
-                "tlsSettings": {
-                    "allowInsecure": False,
-                    "alpn": [],
-                    "certificates": [],
-                    "disableSystemRoot": False,
-                    "serverName": "",
-                },
-                "wsSettings": {
-                    "headers": {"Host": ""},
-                    "path": "",
-                },
+                "network": "ws",
+                "security": "tls",
+                "tlsSettings": {"allowInsecure": False, "serverName": "nc.b2rc.ru"},
+                "wsSettings": {"headers": {"Host": "nc.b2rc.ru"}, "path": "/download"},
             },
-            "tag": "outBound_PROXY",
-        }
-    ]
+            "tag": "proxy",
+        },
+    ],
 }

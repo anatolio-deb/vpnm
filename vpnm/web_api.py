@@ -7,43 +7,47 @@ Raises:
 """
 from __future__ import annotations
 
+import json
 import subprocess
 from random import randint
 from threading import Thread
+from typing import Dict
 
 from simple_term_menu import TerminalMenu
 from vpnmauth import VpnmApiClient
 
-from vpnm.utils import JSONFileStorage
+from vpnm import templates
+from vpnm.utils import CONFIG, SECRET
 
-from .templates import TEMPLATE_443, TEMPLATE_NON_443
 
-
-def get_prompt_desicion() -> bool:
-    """A helper function to pass a value to click framework's click_option decorator.
-    Helname to decide wether to prompt user's email and pasword to get a new web token.
-
-    Returns:
-        bool: True if there's no secret file on the clients filesystem, else False
-    """
-    return not bool(JSONFileStorage("secret"))
+def is_authenticated() -> bool:
+    return bool(SECRET.exists() and SECRET.read_text())
 
 
 class Subscrition:
-    node: dict = {}
     nodes: list = []
+    node: Dict = {}
     threads: list[Thread] = []
-    config = JSONFileStorage("config")
-    secret = JSONFileStorage("secret")
-    api_client = VpnmApiClient(
-        api_url="https://ssle4.ru/api", token=secret.get("token")
-    )
-    template: dict
+    config: Dict = {}
+    host: str
+
+    def __init__(self) -> None:
+        if is_authenticated():
+            with open(SECRET, "r", encoding="utf-8") as file:
+                secret = json.load(file)
+
+            self.api_client = VpnmApiClient(
+                api_url="https://ssle4.ru/api", token=secret["token"]
+            )
 
     def _ping(self, node: dict) -> None:
+        if node["server"][0][1] == "443":
+            host = node["server"][1]["server"]
+        else:
+            host = node["server"][0][0]
         try:
             proc = subprocess.run(
-                ["ping", "-c", "1", node["server"]["address"]],
+                ["ping", "-c", "1", host],
                 check=True,
                 capture_output=True,
             )
@@ -61,8 +65,8 @@ class Subscrition:
         socks_port: int,
         mode: str,
     ):
-        data = self.api_client.nodes
-        self.nodes = data["node"]
+        response = self.api_client.nodes
+        self.nodes = response["data"]["node"]
 
         for node in self.nodes:
             thread = Thread(target=self._ping, args=(node,))
@@ -101,47 +105,56 @@ class Subscrition:
 
         self.node = self.nodes[index]
 
-        if self.node["server"]["port"] == "443":
-            self.template = TEMPLATE_443
+        if self.node["server"][0][1] == "443":
+            self.host = self.node["server"][1]["server"]
+            config = templates.PORT_443
+            config["outbounds"][0]["settings"]["vnext"][0]["address"] = self.node[
+                "server"
+            ][1]["server"]
+            config["outbounds"][0]["streamSettings"]["security"] = self.node["server"][
+                0
+            ][3]
+            config["outbounds"][0]["streamSettings"]["network"] = self.node["server"][
+                0
+            ][4]
+            config["outbounds"][0]["streamSettings"]["wsSettings"]["headers"][
+                "Host"
+            ] = self.host
+            config["outbounds"][0]["streamSettings"]["wsSettings"]["path"] = self.node[
+                "server"
+            ][1]["path"]
+            config["outbounds"][0]["streamSettings"]["tlsSettings"][
+                "serverName"
+            ] = self.host
         else:
-            self.template = TEMPLATE_NON_443
+            self.host = self.node["server"][0][0]
+            config = templates.PORT_NON_443
+            config["outbounds"][0]["settings"]["vnext"][0]["address"] = self.node[
+                "server"
+            ][0][0]
+            config["outbounds"][0]["streamSettings"]["network"] = self.node["server"][
+                0
+            ][3]
 
-        self.template["outbounds"][0]["settings"]["vnext"][0]["address"] = self.node[
-            "server"
-        ]["address"]
-        self.template["outbounds"][0]["settings"]["vnext"][0]["port"] = int(
-            self.node["server"]["port"]
+        config["outbounds"][0]["settings"]["vnext"][0]["users"][0]["id"] = response[
+            "data"
+        ]["user_id"]
+        config["outbounds"][0]["settings"]["vnext"][0]["port"] = int(
+            self.node["server"][0][1]
         )
-        self.template["outbounds"][0]["settings"]["vnext"][0]["users"][0][
-            "alterId"
-        ] = int(self.node["server"]["alterId"])
-        self.template["outbounds"][0]["settings"]["vnext"][0]["users"][0]["id"] = data[
-            "user_id"
-        ]
-        self.template["outbounds"][0]["streamSettings"]["network"] = self.node[
-            "server"
-        ]["network"]
-        self.template["outbounds"][0]["streamSettings"]["security"] = self.node[
-            "server"
-        ].get("security")
-        self.template["outbounds"][0]["streamSettings"]["tlsSettings"][
-            "serverName"
-        ] = self.node["server"]["host"]
-        self.template["outbounds"][0]["streamSettings"]["wsSettings"]["headers"][
-            "Host"
-        ] = self.node["server"]["host"]
-        self.template["outbounds"][0]["streamSettings"]["wsSettings"][
-            "path"
-        ] = self.node["server"]["path"]
-
-        if self.config != self.template:
-            self.config["inbound"] = {
+        config["outbounds"][0]["settings"]["vnext"][0]["users"][0]["alterId"] = int(
+            self.node["server"][0][2]
+        )
+        config["inbounds"] = [
+            {
                 "listen": "127.0.0.1",
-                "port": socks_port,
+                "port": int(socks_port),
                 "protocol": "socks",
                 "settings": {"auth": "noauth", "udp": True, "userLevel": 8},
                 "sniffing": {"destOverride": [], "enabled": False},
                 "tag": "socks",
-            }
-            self.config["log"] = {"loglevel": "warning"}
-            self.config["outbounds"] = self.template["outbounds"]
+            },
+        ]
+
+        with open(CONFIG, "w", encoding="utf-8") as file:
+            json.dump(config, file, indent=4)

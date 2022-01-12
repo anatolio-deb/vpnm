@@ -1,5 +1,6 @@
 """A click framework console application"""
 import datetime
+import json
 import re
 from subprocess import CalledProcessError
 
@@ -9,7 +10,7 @@ from requests.exceptions import HTTPError
 from vpnmauth import VpnmApiClient
 
 from vpnm import __version__, vpnmd_api, web_api
-from vpnm.utils import JSONFileStorage, get_location
+from vpnm.utils import SECRET, get_location, init
 
 
 @click.group()
@@ -17,25 +18,24 @@ from vpnm.utils import JSONFileStorage, get_location
 # @click.pass_context
 def cli():
     """VPN Manager - secure internet access"""
-    pass
+    init()
 
 
 @cli.command(help="Login into VPN Manager account")
 @click.option(
-    "--email", prompt=web_api.get_prompt_desicion(), help="Registered email address"
+    "--email", prompt=not web_api.is_authenticated(), help="Registered email address"
 )
 @click.option(
     "--password",
-    prompt=web_api.get_prompt_desicion(),
+    prompt=not web_api.is_authenticated(),
     hide_input=True,
     help="Password provided at registration",
 )
 def login(email: str, password: str):
-    if web_api.get_prompt_desicion():
+    if not web_api.is_authenticated():
         api_client = VpnmApiClient(
             api_url="https://ssle4.ru/api", email=email, password=password
         )
-        secret = JSONFileStorage("secret")
 
         try:
             response = api_client.login()
@@ -45,10 +45,10 @@ def login(email: str, password: str):
             else:
                 click.secho("Can't connect to API", fg="red")
         else:
-            secret["token"] = response["token"]
-            secret["user_id"] = response["user_id"]
+            with open(SECRET, "w", encoding="utf-8") as file:
+                json.dump(response["data"], file)
 
-    if not web_api.get_prompt_desicion():
+    if web_api.is_authenticated():
         click.secho("Logged in", fg="green")
 
 
@@ -67,8 +67,10 @@ def status():
 
 @cli.command(help="Get information on your account")
 def account():
-    if not web_api.get_prompt_desicion():
-        secret = JSONFileStorage("secret")
+    if web_api.is_authenticated():
+        with open(SECRET, "r", encoding="utf-8") as file:
+            secret = json.loads(file)
+
         api_client = VpnmApiClient(
             api_url="https://ssle4.ru/api",
             user_id=secret["user_id"],
@@ -127,7 +129,7 @@ def account():
 def connect(mode):
     """Sends an IPC request to the VPNM daemon service"""
 
-    if not web_api.get_prompt_desicion():
+    if web_api.is_authenticated():
         try:
             connection.start(mode)
         except ConnectionRefusedError:
@@ -185,10 +187,9 @@ def disconnect(force: bool):
 @cli.command(help="Logout from your VPN Manager account")
 def logout():
     """Remove the web_api.PathService.secret"""
-    secret = JSONFileStorage("secret")
 
-    if not web_api.get_prompt_desicion() and secret:
-        secret.filepath.unlink()
+    if web_api.is_authenticated():
+        SECRET.unlink()
     click.secho("Logged out", fg="red")
 
 
