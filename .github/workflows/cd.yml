@@ -29,7 +29,7 @@ jobs:
       - name: "Build"
         run: |
           pip install pyinstaller
-          pyinstaller -F -n vpnm --clean vpnm/app.py
+          pyinstaller -F -n vpnm --clean app.py
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
