@@ -16,7 +16,7 @@
     ],
     "python.linting.pylintArgs": [
         "--max-line-length=88",
-        "--disable=missing-function-docstring, unnecessary-pass, too-many-branches",
+        "--disable=missing-function-docstring, too-many-branches",
         "--notes= "
     ]
 }

@@ -1,3 +1,4 @@
+""""v2ray configuration templates"""
 from typing import Dict
 
 PORT_NON_443: Dict = {
