@@ -20,7 +20,7 @@ jobs:
         run: |
           python3 -m pip install --upgrade pip
           pip install poetry
-          poetry export -f requirements.txt --output requirements.txt
+          poetry export -o requirements.txt --without-hashes
           pip install -r requirements.txt
       - name: Lint with pylint
         run: |
