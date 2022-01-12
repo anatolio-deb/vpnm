@@ -25,6 +25,8 @@ def is_authenticated() -> bool:
 
 
 class Subscrition:
+    """Parses nodes from vpnm backend
+    """
     nodes: list = []
     node: Dict = {}
     threads: list[Thread] = []
@@ -40,7 +42,7 @@ class Subscrition:
                 api_url="https://ssle4.ru/api", token=secret["token"]
             )
 
-    def _ping(self, node: dict) -> None:
+    def ping(self, node: dict) -> None:
         if node["server"][0][1] == "443":
             host = node["server"][1]["server"]
         else:
@@ -69,7 +71,7 @@ class Subscrition:
         self.nodes = response["data"]["node"]
 
         for node in self.nodes:
-            thread = Thread(target=self._ping, args=(node,))
+            thread = Thread(target=self.ping, args=(node,))
             thread.start()
             self.threads.append(thread)
 
