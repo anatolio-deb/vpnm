@@ -1,3 +1,3 @@
 """VPN Manager CLI client"""
 
-__version__ = "1.2.1.post.1"
+__version__ = "1.2.1.post.2"
