@@ -14,7 +14,7 @@ from threading import Thread
 from typing import Dict
 
 from simple_term_menu import TerminalMenu
-from vpnmauth import VpnmApiClient
+from vpnmauth import VpnmApiClient, get_hostname_or_address
 
 from vpnm import templates
 from vpnm.utils import CONFIG, SECRET
@@ -25,8 +25,8 @@ def is_authenticated() -> bool:
 
 
 class Subscrition:
-    """Parses nodes from vpnm backend
-    """
+    """Parses nodes from vpnm backend"""
+
     nodes: list = []
     node: Dict = {}
     threads: list[Thread] = []
@@ -38,18 +38,12 @@ class Subscrition:
             with open(SECRET, "r", encoding="utf-8") as file:
                 secret = json.load(file)
 
-            self.api_client = VpnmApiClient(
-                api_url="https://ssle4.ru/api", token=secret["token"]
-            )
+            self.api_client = VpnmApiClient(token=secret["token"])
 
     def ping(self, node: dict) -> None:
-        if node["server"][0][1] == "443":
-            host = node["server"][1]["server"]
-        else:
-            host = node["server"][0][0]
         try:
             proc = subprocess.run(
-                ["ping", "-c", "1", host],
+                ["ping", "-c", "1", get_hostname_or_address(node)],
                 check=True,
                 capture_output=True,
             )
@@ -107,8 +101,9 @@ class Subscrition:
 
         self.node = self.nodes[index]
 
+        self.host = get_hostname_or_address(self.node)
+
         if self.node["server"][0][1] == "443":
-            self.host = self.node["server"][1]["server"]
             config = templates.PORT_443
             config["outbounds"][0]["settings"]["vnext"][0]["address"] = self.node[
                 "server"
@@ -129,7 +124,6 @@ class Subscrition:
                 "serverName"
             ] = self.host
         else:
-            self.host = self.node["server"][0][0]
             config = templates.PORT_NON_443
             config["outbounds"][0]["settings"]["vnext"][0]["address"] = self.node[
                 "server"

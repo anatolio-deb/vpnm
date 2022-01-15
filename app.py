@@ -33,9 +33,7 @@ def cli():
 )
 def login(email: str, password: str):
     if not web_api.is_authenticated():
-        api_client = VpnmApiClient(
-            api_url="https://ssle4.ru/api", email=email, password=password
-        )
+        api_client = VpnmApiClient(email=email, password=password)
 
         try:
             response = api_client.login()
@@ -72,7 +70,6 @@ def account():
             secret = json.load(file)
 
         api_client = VpnmApiClient(
-            api_url="https://ssle4.ru/api",
             user_id=secret["user_id"],
             token=secret["token"],
         )
