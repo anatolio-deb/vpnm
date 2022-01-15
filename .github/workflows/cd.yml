@@ -30,7 +30,6 @@ jobs:
         env:
           VPNM_API_URL: ${{ secrets.VPNM_API_URL }}
         run: |
-          echo ${{ env.VPNM_API_URL }}
           pip install pyinstaller
           pyinstaller -F -n vpnm --clean app.py
       - uses: "marvinpinto/action-automatic-releases@latest"
