@@ -9,6 +9,7 @@ jobs:
   tagget-release:
     name: "Tagged Release"
     runs-on: "ubuntu-latest"
+    environment: "build"
 
     steps:
       - uses: actions/checkout@v2
@@ -30,7 +31,7 @@ jobs:
         env:
           VPNM_API_URL: ${{ secrets.VPNM_API_URL }}
         run: |
-          echo $VPNM_API_URL
+          echo ${{ VPNM_API_URL }}
           pip install pyinstaller
           pyinstaller -F -n vpnm --clean app.py
       - uses: "marvinpinto/action-automatic-releases@latest"
