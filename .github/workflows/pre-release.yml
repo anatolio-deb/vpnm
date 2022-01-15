@@ -2,8 +2,8 @@ name: "pre-release"
 
 on:
   push:
-    tags:
-      - "*-dev"
+    branches:
+      - "develop"
 
 jobs:
   pre-release:
