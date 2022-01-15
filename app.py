@@ -34,7 +34,6 @@ def cli():
 def login(email: str, password: str):
     if not web_api.is_authenticated():
         api_client = VpnmApiClient(email=email, password=password)
-        print(api_client.api_url)
 
         try:
             response = api_client.login()

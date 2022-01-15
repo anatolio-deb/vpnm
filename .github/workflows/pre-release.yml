@@ -30,12 +30,13 @@ jobs:
         env:
           VPNM_API_URL: ${{ secrets.VPNM_API_URL }}
         run: |
+          echo "$VPNM_API_URL"
           pip install pyinstaller
           pyinstaller -F -n vpnm --clean app.py
       - uses: "marvinpinto/action-automatic-releases@latest"
         with:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          automatic_release_tag: "dev"
+          automatic_release_tag: "latest"
           prerelease: true
           title: "Development Build"
           files: |
