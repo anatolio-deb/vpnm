@@ -9,7 +9,6 @@ jobs:
   tagget-release:
     name: "Tagged Release"
     runs-on: "ubuntu-latest"
-    environment: "build"
 
     steps:
       - uses: actions/checkout@v2
