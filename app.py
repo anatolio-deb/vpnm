@@ -9,7 +9,7 @@ import requests
 from requests.exceptions import HTTPError
 from vpnmauth import VpnmApiClient
 
-from vpnm import __version__, vpnmd_api, web_api
+from vpnm import VPNM_API_URL, __version__, vpnmd_api, web_api
 from vpnm.utils import SECRET, get_location, init
 
 
@@ -33,7 +33,7 @@ def cli():
 )
 def login(email: str, password: str):
     if not web_api.is_authenticated():
-        api_client = VpnmApiClient(email=email, password=password)
+        api_client = VpnmApiClient(email=email, password=password, api_url=VPNM_API_URL)
 
         try:
             response = api_client.login()
@@ -70,8 +70,7 @@ def account():
             secret = json.load(file)
 
         api_client = VpnmApiClient(
-            user_id=secret["user_id"],
-            token=secret["token"],
+            user_id=secret["user_id"], token=secret["token"], api_url=VPNM_API_URL
         )
 
         try:
