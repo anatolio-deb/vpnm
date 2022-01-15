@@ -433,7 +433,7 @@ socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
 
 [[package]]
 name = "vpnmauth"
-version = "0.2.5"
+version = "0.2.6"
 description = ""
 category = "main"
 optional = false
@@ -447,7 +447,7 @@ requests = "^2.27.1"
 type = "git"
 url = "https://github.com/anatolio-deb/vpnmauth.git"
 reference = "master"
-resolved_reference = "5c7ad600e1cdd1ace60293d6263dd58572f39e26"
+resolved_reference = "692954a2d5bfedb370caadf8a6995d943061e135"
 
 [[package]]
 name = "wcwidth"
