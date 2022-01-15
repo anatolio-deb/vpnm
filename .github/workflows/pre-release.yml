@@ -1,0 +1,42 @@
+name: "pre-release"
+
+on:
+  push:
+    tags:
+      - "*-dev"
+
+jobs:
+  pre-release:
+    name: "Pre Release"
+    runs-on: "ubuntu-latest"
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: "Set up python3.9"
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.9
+      - name: "Install dependencies"
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install poetry
+          poetry export -o requirements.txt --without-hashes
+          pip install -r requirements.txt
+      - name: Lint with pylint
+        run: |
+          pip install pylint
+          pylint --max-line-length=88 --disable=missing-function-docstring,too-many-branches,unspecified-encoding --notes= vpnm/ app.py
+      - name: "Build"
+        env:
+          VPNM_API_URL: ${{ secrets.VPNM_API_URL }}
+        run: |
+          pip install pyinstaller
+          pyinstaller -F -n vpnm --clean app.py
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          automatic_release_tag: "dev"
+          prerelease: true
+          title: "Development Build"
+          files: |
+            dist/vpnm
