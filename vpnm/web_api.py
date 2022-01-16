@@ -16,7 +16,7 @@ from typing import Dict
 from simple_term_menu import TerminalMenu
 from vpnmauth import VpnmApiClient, get_hostname_or_address
 
-from vpnm import templates
+from vpnm import VPNM_API_URL, templates
 from vpnm.utils import CONFIG, SECRET
 
 
@@ -38,7 +38,7 @@ class Subscrition:
             with open(SECRET, "r", encoding="utf-8") as file:
                 secret = json.load(file)
 
-            self.api_client = VpnmApiClient(token=secret["token"])
+            self.api_client = VpnmApiClient(token=secret["token"], api_url=VPNM_API_URL)
 
     def ping(self, node: dict) -> None:
         try:
